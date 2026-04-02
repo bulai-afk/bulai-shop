@@ -1,0 +1,65 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  /* Навбар: полное меню от 1200px, ниже — бургер */
+  --breakpoint-nav: 1200px;
+}
+
+html {
+  background-color: var(--color-gray-950);
+  overscroll-behavior-y: none;
+  overflow-y: hidden;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-gray-950);
+  color: var(--color-gray-100);
+  color-scheme: dark;
+  overscroll-behavior-y: none;
+  height: 100dvh;
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox: hide system scrollbar */
+}
+
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* WebKit: hide system scrollbar */
+}
+
+/* `Layout` уже задаёт минимальную высоту экрана (`min-h-dvh`), здесь не фиксируем высоты,
+   чтобы не раздувать `documentElement.scrollHeight` и не ломать размер скроллбара. */
+
+/* Prevent layout jump when scrollbars appear/expand. */
+.stable-scroll {
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin; /* Firefox */
+}
+
+.stable-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+.stable-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.stable-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.stable-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+/* Скрыть нативный скролл там, где рисуем кастомный ползунок (каталог и т.п.) */
+.no-native-scrollbar {
+  scrollbar-width: none;
+}
+.no-native-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
