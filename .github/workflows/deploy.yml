@@ -59,9 +59,31 @@ jobs:
           DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" | sed 's/\\n/\n/g' > ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" | sed 's/\\n/\n/g' | sed 's/\r$//' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          if ! grep -q '^-----BEGIN .*PRIVATE KEY-----' ~/.ssh/deploy_key; then
+            echo "::error::DEPLOY_SSH_KEY must be the full private key (starts with -----BEGIN … PRIVATE KEY-----), not the .pub file."
+            exit 1
+          fi
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null 2>&1; then
+            echo "::error::DEPLOY_SSH_KEY is invalid or corrupted. Re-paste the private key in GitHub Secrets (multiline, with header/footer lines)."
+            exit 1
+          fi
+          echo "Deploy key fingerprint (must be in server authorized_keys for DEPLOY_USER):"
+          ssh-keygen -lf <(ssh-keygen -y -f ~/.ssh/deploy_key)
           ssh-keyscan -4 -p "${DEPLOY_SSH_PORT}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Test SSH login
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
+        run: |
+          SSH_OPTS="-i ~/.ssh/deploy_key -4 -o AddressFamily=inet -p ${DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30"
+          if ! ssh $SSH_OPTS "${DEPLOY_USER}@${DEPLOY_HOST}" 'echo ssh-ok'; then
+            echo "::error::SSH login failed for ${DEPLOY_USER}@${DEPLOY_HOST}. Check: (1) DEPLOY_USER matches SSH login in ISPmanager (often bulaiby or h202138), (2) public key from this fingerprint is added in panel → SSH keys for that user, (3) DEPLOY_SSH_KEY is the matching private key, not from vh151."
+            exit 1
+          fi
 
       - name: Diagnose SSH reachability
         env:

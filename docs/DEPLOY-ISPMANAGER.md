@@ -64,14 +64,34 @@ CORS_ORIGINS=https://bulai.by,https://www.bulai.by
 На сервере **87.232.64.14** в ISPmanager добавьте публичный ключ деплоя, затем в GitHub Secrets:
 
 - `DEPLOY_HOST` = `87.232.64.14`
-- `DEPLOY_USER` = `bulaiby`
-- `DEPLOY_SSH_KEY` = приватный ключ `deploy_bulai`
+- `DEPLOY_USER` = **точный SSH-логин из панели** (часто `bulaiby` или `h202138` — не логин от vh151)
+- `DEPLOY_SSH_KEY` = **весь** приватный ключ (многострочный), не `.pub`
 
 Публичный ключ (файл `deploy_bulai.pub`):
 
 ```
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDKbaG02wGDxqTUWMDhcpiLyARN+ZKw4GoqZHUjhHQfn deploy-bulai
 ```
+
+### `Permission denied (publickey)`
+
+1. На Mac с тем же ключом:  
+   `ssh -4 -i ~/.ssh/deploy_bulai bulaiby@87.232.64.14`  
+   (замените пользователя, если в панели другой).
+2. Если локально **не** заходит — в ISPmanager: **Пользователи → ваш пользователь → SSH-ключи** → вставьте строку из `.pub` выше (или новый ключ).
+3. В GitHub Secret `DEPLOY_SSH_KEY` — содержимое **приватного** файла, например:
+   ```
+   -----BEGIN OPENSSH PRIVATE KEY-----
+   …
+   -----END OPENSSH PRIVATE KEY-----
+   ```
+   Не вставляйте ключ от vh151, если деплой на 87.232.
+4. В логе Actions шаг **Setup SSH key** печатает **fingerprint** — он должен совпадать с ключом на сервере.
+5. Сгенерировать новую пару (если старый ключ потерян):
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/deploy_bulai -C deploy-bulai -N ""
+   ```
+   `.pub` → в панель, приватный → в `DEPLOY_SSH_KEY`.
 
 ## Ручная заливка с Mac (если ключ ещё не добавлен)
 

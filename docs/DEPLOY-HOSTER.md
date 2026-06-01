@@ -72,6 +72,10 @@ dig +short bulai.by A
    - self-hosted runner на сервере.
 4. В логе шага **Diagnose SSH reachability** смотрите DNS и результат `nc` — там будет явная подсказка.
 
+### `Permission denied (publickey)`
+
+Сеть до сервера есть, но **ключ или логин не совпадают**. См. раздел в `docs/DEPLOY-ISPMANAGER.md`: `DEPLOY_USER` = SSH-логин на **87.232**, публичный ключ в панели, в Secret — приватный ключ целиком.
+
 ## 3. Деплой
 
 Пуш в ветку **`main`** или **Actions → Deploy to production → Run workflow**.
