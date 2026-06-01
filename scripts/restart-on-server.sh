@@ -5,12 +5,25 @@ set -e
 DEPLOY_DIR="${DEPLOY_DIR:-$HOME/bulai-shop}"
 PORT="${PORT:-3001}"
 LOG="${DEPLOY_DIR}/node.log"
-NODE_BIN="${NODE_BIN:-$HOME/nodevenv/bulai-shop/20/bin/node}"
 
 cd "$DEPLOY_DIR"
 
-if [ ! -f "$NODE_BIN" ]; then
-  NODE_BIN="$(command -v node)"
+if [ -z "${NODE_BIN:-}" ] || [ ! -x "$NODE_BIN" ]; then
+  for candidate in \
+    "$HOME/nodevenv/bulai-shop/20/bin/node" \
+    "$HOME/nodevenv/bulai/20/bin/node" \
+    "$(command -v node 2>/dev/null || true)"
+  do
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+      NODE_BIN="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -z "${NODE_BIN:-}" ] || [ ! -x "$NODE_BIN" ]; then
+  echo "ERROR: Node.js not found. Create nodevenv in panel or set NODE_BIN."
+  exit 1
 fi
 
 if [ ! -f start.js ] || [ ! -f server/dist/index.js ] || [ ! -d dist ]; then
