@@ -54,21 +54,50 @@ jobs:
           fi
 
       - name: Setup SSH key
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" | sed 's/\\n/\n/g' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -4 -p "${DEPLOY_SSH_PORT}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Diagnose SSH reachability
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
+        run: |
+          set +e
+          echo "DEPLOY_HOST=${DEPLOY_HOST}"
+          echo "DEPLOY_SSH_PORT=${DEPLOY_SSH_PORT}"
+          echo "--- DNS A ---"
+          dig +short A "${DEPLOY_HOST}" || true
+          echo "--- DNS AAAA ---"
+          dig +short AAAA "${DEPLOY_HOST}" || true
+          echo "--- TCP (IPv4) ---"
+          if command -v nc >/dev/null; then
+            nc -4 -zv -w 8 "${DEPLOY_HOST}" "${DEPLOY_SSH_PORT}"
+            NC_EXIT=$?
+          else
+            timeout 8 bash -c "echo >/dev/tcp/${DEPLOY_HOST}/${DEPLOY_SSH_PORT}" 2>/dev/null
+            NC_EXIT=$?
+          fi
+          if [ "${NC_EXIT:-1}" -ne 0 ]; then
+            echo "::error::GitHub runner cannot reach ${DEPLOY_HOST}:${DEPLOY_SSH_PORT}. Check DEPLOY_HOST (use 87.232.64.14 for bulai.by ISPmanager, not vh151), firewall, and that SSH is open from the internet. See docs/DEPLOY-HOSTER.md"
+            exit 1
+          fi
 
       - name: Upload and deploy
         timeout-minutes: 15
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
           REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR || 'bulai-shop' }}
         run: |
           set -e
-          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=300 -o ServerAliveInterval=60"
+          SSH_OPTS="-i ~/.ssh/deploy_key -4 -o AddressFamily=inet -p ${DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=300 -o ServerAliveInterval=60"
           REMOTE_HOME=$(ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} 'echo $HOME' | tr -d '\r\n')
           REMOTE="${REMOTE_HOME}/${REMOTE_DIR}"
           ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p ${REMOTE}/scripts ${REMOTE}/tmp"
@@ -83,9 +112,10 @@ jobs:
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
           REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR || 'bulai-shop' }}
         run: |
-          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=15"
+          SSH_OPTS="-i ~/.ssh/deploy_key -4 -o AddressFamily=inet -p ${DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=15"
           REMOTE_DIST=$(ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} "stat -c %s ~/${REMOTE_DIR}/dist.tar.gz 2>/dev/null || echo 0")
           REMOTE_SERVER=$(ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} "stat -c %s ~/${REMOTE_DIR}/server.tar.gz 2>/dev/null || echo 0")
           if [ "$REMOTE_DIST" != "$DIST_SIZE" ] || [ "$REMOTE_SERVER" != "$SERVER_SIZE" ]; then
@@ -98,10 +128,11 @@ jobs:
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
           REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR || 'bulai-shop' }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '3001' }}
         run: |
-          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=60 -o BatchMode=yes"
+          SSH_OPTS="-i ~/.ssh/deploy_key -4 -o AddressFamily=inet -p ${DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=60 -o BatchMode=yes"
           REMOTE_HOME=$(ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} 'echo $HOME' | tr -d '\r\n')
           ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${REMOTE_HOME}/${REMOTE_DIR} && DEPLOY_DIR=${REMOTE_HOME}/${REMOTE_DIR} PORT=${DEPLOY_PORT} bash -s" < scripts/deploy-remote.sh
 
@@ -110,9 +141,10 @@ jobs:
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
           REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR || 'bulai-shop' }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '3001' }}
         run: |
-          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30"
+          SSH_OPTS="-i ~/.ssh/deploy_key -4 -o AddressFamily=inet -p ${DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=30"
           ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} \
             "DEPLOY_DIR=\$HOME/${REMOTE_DIR} PORT=${DEPLOY_PORT} bash \$HOME/${REMOTE_DIR}/scripts/restart-on-server.sh"

@@ -55,9 +55,22 @@ dig +short bulai.by A
 | `VITE_YANDEX_CLIENT_ID` | OAuth Яндекс |
 | `VITE_YANDEX_REDIRECT_URI` | Необязательно: `https://домен/auth/yandex/callback` |
 | `DEPLOY_REMOTE_DIR` | Необязательно, по умолчанию `bulai-shop` |
-| `DEPLOY_PORT` | Необязательно, по умолчанию `3001` |
+| `DEPLOY_PORT` | Необязательно, порт **Node** на сервере (по умолчанию `3001`) |
+| `DEPLOY_SSH_PORT` | Необязательно, порт **SSH** (по умолчанию `22`) |
 
 В кабинете Яндекс ID укажите Redirect URI вашего домена.
+
+### Ошибка GitHub Actions: `Network is unreachable` / `exit code 255`
+
+Раннер GitHub **не может открыть TCP до сервера** (это не ошибка ключа).
+
+1. **`DEPLOY_HOST`** — для **bulai.by** укажите IP **`87.232.64.14`**, не `vh151.hoster.by` и не `93.125.99.153`, если DNS домена на ISPmanager.
+2. С Mac проверьте: `ssh -4 bulaiby@87.232.64.14` (подставьте своего пользователя).
+3. Если с Mac работает, а из Actions — нет: хостинг может **блокировать SSH с дата-центров** (GitHub). Варианты:
+   - разрешить входящий SSH с интернета в панели / в поддержку Hoster;
+   - деплой вручную: `rsync` (см. `docs/DEPLOY-ISPMANAGER.md`);
+   - self-hosted runner на сервере.
+4. В логе шага **Diagnose SSH reachability** смотрите DNS и результат `nc` — там будет явная подсказка.
 
 ## 3. Деплой
 
