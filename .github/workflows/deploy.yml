@@ -72,6 +72,13 @@ jobs:
           echo "DEPLOY_HOST=${DEPLOY_HOST}"
           echo "DEPLOY_SSH_PORT=${DEPLOY_SSH_PORT}"
           echo "--- DNS A ---"
+          RESOLVED_A=$(dig +short A "${DEPLOY_HOST}" | head -1 | tr -d '\r')
+          echo "${RESOLVED_A}"
+          # bulai.by на ISPmanager (87.232), не vh151/cPanel (93.125)
+          if [ "${RESOLVED_A}" = "93.125.99.153" ] || [ "${DEPLOY_HOST}" = "vh151.hoster.by" ]; then
+            echo "::error::DEPLOY_HOST указывает на vh151 (93.125.99.153). Для bulai.by в Secrets задайте DEPLOY_HOST=87.232.64.14 и DEPLOY_USER=bulaiby (см. docs/DEPLOY-ISPMANAGER.md)."
+            exit 1
+          fi
           dig +short A "${DEPLOY_HOST}" || true
           echo "--- DNS AAAA ---"
           dig +short AAAA "${DEPLOY_HOST}" || true

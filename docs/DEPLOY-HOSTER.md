@@ -49,8 +49,8 @@ dig +short bulai.by A
 
 | Секрет | Описание |
 |--------|----------|
-| `DEPLOY_HOST` | **`87.232.64.14`** (ISPmanager) или `vh151.hoster.by` только для cPanel |
-| `DEPLOY_USER` | SSH-пользователь (как у bulai.by) |
+| `DEPLOY_HOST` | **Только `87.232.64.14`** для bulai.by (ISPmanager). **Не** `vh151.hoster.by` / `93.125.99.153` |
+| `DEPLOY_USER` | **`bulaiby`** на 87.232 (не логин от vh151, если он другой) |
 | `DEPLOY_SSH_KEY` | Приватный SSH-ключ (можно тот же) |
 | `VITE_YANDEX_CLIENT_ID` | OAuth Яндекс |
 | `VITE_YANDEX_REDIRECT_URI` | Необязательно: `https://домен/auth/yandex/callback` |
