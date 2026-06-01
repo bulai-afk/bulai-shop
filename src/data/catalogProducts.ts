@@ -6,6 +6,20 @@ export type ColorSwatch = {
   image: string
 }
 
+/** Как в OpenAPI `ProductAccordionFeatures`: четыре строки + прочие пункты. */
+export type ProductAccordionFeatures = {
+  category?: string
+  fit?: string
+  material?: string
+  season?: string
+  any?: string[]
+}
+
+export type ProductAccordionSections = {
+  features?: ProductAccordionFeatures
+  care?: string[]
+}
+
 export type Product = {
   id: string
   name: string
@@ -18,6 +32,8 @@ export type Product = {
   reviews: number
   sizes: string[]
   colors: ColorSwatch[]
+  /** С API: переопределяет блоки аккордеона «Особенности» / «Уход». */
+  accordionSections?: ProductAccordionSections
 }
 
 const BASE_PRODUCTS: Product[] = [
@@ -375,6 +391,60 @@ export type ProductMeta = {
   material: 'хлопок' | 'деним' | 'смесовая' | 'лен'
   season: 'лето' | 'деми' | 'зима'
   inStock: boolean
+}
+
+export const FIT_LABELS: Record<ProductMeta['fit'], string> = {
+  slim: 'Приталенная',
+  regular: 'Стандартная',
+  relaxed: 'Свободная',
+  wide: 'Широкая',
+}
+
+const DEFAULT_ACCORDION_FEATURES_ANY: string[] = [
+  'Плотная строчка по швам, усиленные точки натяжения',
+  'Фурнитура без никеля (по большинству моделей)',
+  'Цвет на экране может слегка отличаться от реального — это норма для фото',
+]
+
+const DEFAULT_ACCORDION_CARE: string[] = [
+  'Следуйте символам на вшивной этикетке — у разных цветов режим может отличаться',
+  'Стирка при 30 °C, деликатный отжим; не использовать отбеливатель',
+  'Гладить с изнанки при необходимости, средняя температура',
+  'Не сушить на батарее и в прямых солнечных лучах — чтобы не выцвело',
+  'Для денима и плотного хлопка: первая стирка отдельно, возможен лёгкий линяк',
+]
+
+/** Слияние `meta` и опциональных строк из API / админки. */
+export function resolveProductAccordionFeatures(
+  meta: ProductMeta,
+  fromApi?: ProductAccordionFeatures | null,
+): {
+  category: string
+  fit: string
+  material: string
+  season: string
+  any: string[]
+} {
+  const defaults = {
+    category: meta.category,
+    fit: FIT_LABELS[meta.fit],
+    material: meta.material,
+    season: meta.season,
+    any: DEFAULT_ACCORDION_FEATURES_ANY,
+  }
+  if (!fromApi) return defaults
+  return {
+    category: fromApi.category ?? defaults.category,
+    fit: fromApi.fit ?? defaults.fit,
+    material: fromApi.material ?? defaults.material,
+    season: fromApi.season ?? defaults.season,
+    any: fromApi.any !== undefined ? fromApi.any : defaults.any,
+  }
+}
+
+export function resolveProductAccordionCare(fromApi?: string[] | null): string[] {
+  if (fromApi !== undefined && fromApi !== null) return fromApi
+  return DEFAULT_ACCORDION_CARE
 }
 
 /** Slug в `?category=` для ссылок из мегаменю и шаринга фильтра. */

@@ -1,13 +1,14 @@
 import {
   ArrowRightStartOnRectangleIcon,
   ClipboardDocumentListIcon,
+  Squares2X2Icon,
   UserIcon,
 } from '@heroicons/react/24/outline'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
 import { ElPopover, ElPopoverGroup } from '@tailwindplus/elements/react'
 import type { HTMLAttributes } from 'react'
-import { useEffect, useState } from 'react'
-import type { AuthUser } from '../context/AuthContext'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useOrdersDialog } from '../context/OrdersDialogContext'
 import { useProfileDialog } from '../context/ProfileDialogContext'
@@ -16,14 +17,14 @@ import {
   type CurrencyCode,
   useCurrency,
 } from '../context/CurrencyContext'
+import { profileDisplayName } from '../utils/profileDisplayName'
 import { FlagCircle } from './FlagCircle'
+import { ProfileAvatar } from './ProfileAvatar'
+import { useAdminAccessAllowed } from '../admin/hooks/useAdminAccessAllowed'
+import { buildDefaultPromoMaterials } from '../admin/data/siteSettingsDefaults'
+import { useStorefrontPromoMaterials } from '../context/StorefrontSettingsContext'
 
-const MESSAGES = [
-  'Бесплатная доставка при заказе от 5 000 ₽',
-  'Скидка 15% — промокод HELLO15',
-  'Распродажа сезона: до −40% в каталоге',
-  'Помощь с размером — в разделе «Контакты»',
-] as const
+const FALLBACK_TICKER = buildDefaultPromoMaterials().tickerMessages
 
 const INTERVAL_MS = 4500
 const FADE_MS = 420
@@ -50,46 +51,20 @@ function hideProfileFlyout() {
   }
 }
 
-function avatarInitials(email: string): string {
-  const local = email.split('@')[0]?.trim() ?? ''
-  if (!local) return '?'
-  const parts = local.split(/[._-]+/).filter(Boolean)
-  if (parts.length >= 2) {
-    const a = parts[0]![0]
-    const b = parts[1]![0]
-    if (a && b) return (a + b).toUpperCase()
-  }
-  return local.slice(0, 2).toUpperCase()
-}
-
-function ProfileAvatar({ user }: { user: AuthUser }) {
-  if (user.yandexAvatarUrl) {
-    return (
-      <img
-        src={user.yandexAvatarUrl}
-        alt=""
-        className="size-6 shrink-0 rounded-full object-cover ring-1 ring-white/30"
-      />
-    )
-  }
-  return (
-    <span
-      className="flex size-6 shrink-0 items-center justify-center rounded-full bg-white/20 text-[9px] font-semibold text-white ring-1 ring-white/30 sm:text-[10px]"
-      aria-hidden
-    >
-      {avatarInitials(user.email)}
-    </span>
-  )
-}
-
 /**
- * Верхняя полоска: валюта (flyout слева), ротация промо по центру, «Авторизация» справа (диалог входа).
+ * Верхняя полоска: валюта слева и профиль справа с `nav:`; на узкой ширине валюта — в шапке мобильного меню (`Navbar`). По центру — ротация промо.
  */
 export function DeliveryPromoBar() {
   const { currency, setCurrency } = useCurrency()
   const { user, openAuthDialog, logout } = useAuth()
+  const adminAllowed = useAdminAccessAllowed()
   const { openProfileDialog } = useProfileDialog()
   const { openOrdersDialog } = useOrdersDialog()
+  const promo = useStorefrontPromoMaterials()
+  const messages = useMemo(() => {
+    const t = promo.tickerMessages.map((s) => s.trim()).filter(Boolean)
+    return t.length > 0 ? t : FALLBACK_TICKER
+  }, [promo])
   const [index, setIndex] = useState(0)
   const [reducedMotion, setReducedMotion] = useState(false)
 
@@ -102,14 +77,19 @@ export function DeliveryPromoBar() {
   }, [])
 
   useEffect(() => {
+    setIndex((i) => (messages.length === 0 ? 0 : i % messages.length))
+  }, [messages.length])
+
+  useEffect(() => {
     if (reducedMotion) return
+    if (messages.length <= 1) return
     const id = window.setInterval(() => {
-      setIndex((i) => (i + 1) % MESSAGES.length)
+      setIndex((i) => (i + 1) % messages.length)
     }, INTERVAL_MS)
     return () => window.clearInterval(id)
-  }, [reducedMotion])
+  }, [reducedMotion, messages.length])
 
-  const active = MESSAGES[reducedMotion ? 0 : index]
+  const active = messages[reducedMotion ? 0 : index % Math.max(1, messages.length)]
 
   const pick = (code: CurrencyCode) => {
     setCurrency(code)
@@ -126,11 +106,11 @@ export function DeliveryPromoBar() {
       <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden px-12 sm:px-28 md:px-36 lg:px-40">
         {reducedMotion ? (
           <p className="max-w-full truncate text-center text-xs font-medium text-white sm:text-sm" aria-hidden>
-            {MESSAGES[0]}
+            {messages[0]}
           </p>
         ) : (
           <div className="relative h-10 w-full max-w-4xl overflow-hidden">
-            {MESSAGES.map((text, i) => {
+            {messages.map((text, i) => {
               const on = i === index
               return (
                 <p
@@ -150,6 +130,7 @@ export function DeliveryPromoBar() {
       </div>
 
       <div className="relative z-20 flex min-w-0 flex-1 items-center justify-between gap-2 sm:gap-3">
+        <div className="hidden min-w-0 shrink-0 nav:block">
         <ElPopoverGroup className="group/popover relative min-w-0 shrink-0">
         <button
           type="button"
@@ -189,8 +170,9 @@ export function DeliveryPromoBar() {
           </div>
         </ElPopover>
         </ElPopoverGroup>
+        </div>
 
-        <div className="flex min-w-0 shrink-0 items-center justify-end gap-1 sm:gap-2">
+        <div className="hidden min-w-0 shrink-0 items-center justify-end gap-1 nav:flex sm:gap-2">
           {user ? (
             <ElPopoverGroup className="relative shrink-0">
               <button
@@ -198,14 +180,14 @@ export function DeliveryPromoBar() {
                 popoverTarget={PROFILE_FLYOUT_ID}
                 className="-m-1 inline-flex max-w-full min-h-9 items-center gap-1.5 rounded-md py-1 pl-1 pr-1.5 text-left text-white/90 hover:bg-white/10 hover:text-white sm:m-0 sm:min-h-0 sm:gap-2 sm:pl-1.5 sm:pr-2 sm:py-1"
                 aria-haspopup="menu"
-                aria-label={`Меню профиля: ${user.email}`}
+                aria-label={`Меню профиля, ${user.email}`}
               >
                 <ProfileAvatar user={user} />
                 <span
                   className="min-w-0 max-w-[5.5rem] truncate text-[10px] font-medium sm:max-w-[9rem] sm:text-xs md:max-w-[14rem] md:text-sm"
                   title={user.email}
                 >
-                  {user.email}
+                  {profileDisplayName(user)}
                 </span>
                 <ChevronDownIcon
                   aria-hidden
@@ -230,6 +212,17 @@ export function DeliveryPromoBar() {
                     <UserIcon aria-hidden className="size-4 shrink-0 opacity-90" />
                     Профиль
                   </button>
+                  {adminAllowed ? (
+                    <Link
+                      to="/admin"
+                      role="menuitem"
+                      onClick={() => hideProfileFlyout()}
+                      className="flex w-full items-center gap-2 rounded-md py-1.5 pl-2 pr-2 text-left text-xs font-medium text-white/90 hover:bg-white/10 hover:text-white sm:text-sm"
+                    >
+                      <Squares2X2Icon aria-hidden className="size-4 shrink-0 opacity-90" />
+                      Панель управления
+                    </Link>
+                  ) : null}
                   <button
                     type="button"
                     role="menuitem"
@@ -269,10 +262,10 @@ export function DeliveryPromoBar() {
               type="button"
               onClick={() => openAuthDialog()}
               className="-m-1 inline-flex min-h-9 min-w-9 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-white/90 hover:bg-white/10 hover:text-white sm:m-0 sm:min-h-0 sm:min-w-0 sm:justify-start sm:gap-2 sm:px-2 sm:py-1 sm:text-sm"
-              aria-label="Авторизация"
+              aria-label="Вход и Регистрация"
             >
               <UserIcon aria-hidden className="size-4 shrink-0 opacity-90" />
-              <span className="hidden sm:inline">Авторизация</span>
+              <span className="hidden sm:inline">Вход и Регистрация</span>
             </button>
           )}
         </div>

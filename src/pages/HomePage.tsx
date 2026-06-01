@@ -3,8 +3,10 @@ import { CategoryPreviews } from '../components/CategoryPreviews'
 import { PageScrollbar } from '../components/PageScrollbar'
 import { PopularProducts } from '../components/PopularProducts'
 import { FaqAccordion } from '../components/FaqAccordion'
+import { AdvantagesGrid } from '../components/AdvantagesGrid'
 import { FeaturesGrid } from '../components/FeaturesGrid'
 import { Hero } from '../components/Hero'
+import { useStorefrontPromoMaterials } from '../context/StorefrontSettingsContext'
 import { useBlockRevealProgress, useHeroRevealProgress } from '../hooks/useBlockRevealProgress'
 
 /** Нижняя граница фиксированной шапки: DeliveryPromoBar + Navbar = 6.5rem. */
@@ -18,11 +20,12 @@ const ENABLE_STEP_WHEEL_SCROLL = false
 
 /** Шапка и футер — в `Layout`. Отступ контента под фикс. шапку: `pt-[6.5rem]` в `Layout` для `/`. */
 export function HomePage() {
+  const promo = useStorefrontPromoMaterials()
   const heroRef = useRef<HTMLDivElement>(null)
   const featuresRef = useRef<HTMLElement | null>(null)
+  const advantagesRef = useRef<HTMLElement | null>(null)
   const categoryRef = useRef<HTMLElement | null>(null)
   const popularRef = useRef<HTMLElement | null>(null)
-  const popularServiceDividerRef = useRef<HTMLDivElement | null>(null)
   const faqRef = useRef<HTMLElement | null>(null)
 
   const [sectionsTotalHeightPx, setSectionsTotalHeightPx] = useState<number | null>(null)
@@ -37,6 +40,7 @@ export function HomePage() {
         (h(featuresRef.current) ?? 0) +
         (h(categoryRef.current) ?? 0) +
         (h(popularRef.current) ?? 0) +
+        (h(advantagesRef.current) ?? 0) +
         (h(faqRef.current) ?? 0) +
         (h(footerEl) ?? 0)
 
@@ -46,9 +50,9 @@ export function HomePage() {
       console.log('[HomePage] section heights (px)', {
         hero: h(heroRef.current),
         features: h(featuresRef.current),
+        advantages: h(advantagesRef.current),
         categories: h(categoryRef.current),
         popular: h(popularRef.current),
-        popularServiceDivider: h(popularServiceDividerRef.current),
         faq: h(faqRef.current),
         footer: h(footerEl),
         total,
@@ -95,7 +99,7 @@ export function HomePage() {
       featuresRef.current,
       categoryRef.current,
       popularRef.current,
-      popularServiceDividerRef.current,
+      advantagesRef.current,
       faqRef.current,
     ].filter(Boolean) as HTMLElement[]
 
@@ -128,17 +132,6 @@ export function HomePage() {
     const onWheel = (e: WheelEvent) => {
       if (Math.abs(e.deltaY) < 4 || e.ctrlKey || locked) return
       if (Date.now() - lastSnapAt < SNAP_LOCK_MS) return
-
-      const target = e.target as HTMLElement | null
-      const serviceScroll = target?.closest('[data-popular-service-scroll]') as HTMLElement | null
-      if (serviceScroll) {
-        const canScrollDown =
-          serviceScroll.scrollTop + serviceScroll.clientHeight < serviceScroll.scrollHeight - 1
-        const canScrollUp = serviceScroll.scrollTop > 0
-        if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
-          return
-        }
-      }
 
       wheelAcc += e.deltaY
       window.clearTimeout(wheelIdleTimer)
@@ -325,9 +318,7 @@ export function HomePage() {
   }, [categoryRevealProgress])
 
   /**
-   * «Популярные товары» → FAQ:
-   * триггер по реальной горизонтальной линии внутри популярных (`border-t` сервиса),
-   * чтобы докрутка срабатывала в момент касания линии нижней кромки navbar.
+   * Блок «Наши преимущества» (промо) → FAQ: триггер по верхней кромке секции с картинками.
    */
   useEffect(() => {
     if (!ENABLE_PROGRESS_SNAP) return
@@ -342,14 +333,14 @@ export function HomePage() {
     if (curr < SNAP_BACK_THRESHOLD) {
       faqSnapDoneRef.current = false
     }
-    if (reachedNavbarLine(popularServiceDividerRef.current)) {
+    if (reachedNavbarLine(advantagesRef.current)) {
       popularSnapBackFromFaqRef.current = false
     }
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const behavior = reduced ? ('auto' as const) : ('smooth' as const)
 
-    if (reachedNavbarLine(popularServiceDividerRef.current) && !faqSnapDoneRef.current) {
+    if (reachedNavbarLine(advantagesRef.current) && !faqSnapDoneRef.current) {
       faqSnapDoneRef.current = true
       const el = faqRef.current
       if (el) {
@@ -387,9 +378,20 @@ export function HomePage() {
       <div ref={heroRef} className="min-h-0 scroll-mt-[6.5rem]">
         <Hero />
       </div>
-      <FeaturesGrid ref={featuresRef} />
+      <FeaturesGrid
+        ref={featuresRef}
+        block={promo.homeFeatures}
+        headingId="features-heading"
+        tone="primary"
+      />
       <CategoryPreviews ref={categoryRef} />
-      <PopularProducts ref={popularRef} serviceDividerRef={popularServiceDividerRef} />
+      <PopularProducts ref={popularRef} />
+      <AdvantagesGrid
+        ref={advantagesRef}
+        block={promo.homeAdvantages}
+        headingId="advantages-heading"
+        tone="secondary"
+      />
       <FaqAccordion ref={faqRef} />
     </>
   )

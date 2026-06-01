@@ -1,11 +1,15 @@
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
+import { CheckIcon } from '@heroicons/react/20/solid'
 import { MinusIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BulaiLogo } from '../components/BulaiLogo'
+import { ContactPhoneField } from '../components/ContactPhoneField'
 import { useAuth } from '../context/AuthContext'
 import { formatCartAmount, useCart, type CartLine } from '../context/CartContext'
 import { useCurrency } from '../context/CurrencyContext'
+import { checkoutEmailFieldError, contactEmailError } from '../lib/contactEmail'
+import { formatPhoneForSummaryLine, isCompleteStoredPhoneDigits } from '../lib/contactPhoneInputDisplay'
 
 function lineSaleTotalRub(line: CartLine): number {
   const unit = parseInt(line.priceDisplay.replace(/\D/g, ''), 10) || 0
@@ -15,7 +19,29 @@ function lineSaleTotalRub(line: CartLine): number {
 const inputClass =
   'mt-1 block w-full rounded-md border-0 bg-white/5 px-3 py-2.5 text-sm text-gray-100 ring-1 ring-inset ring-white/10 transition placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500'
 
+const inputInvalidRingClass = ' ring-red-500/50 focus:ring-red-500/50'
+
 type CheckoutStep = 1 | 2 | 3
+
+type DeliveryMethodId = 'cdek' | 'europost' | 'yandex_courier'
+
+const DELIVERY_LOGO: Record<DeliveryMethodId, string> = {
+  cdek: '/delivery/cdek.svg',
+  europost: '/delivery/europost-2.svg',
+  yandex_courier: '/delivery/yandex-delivery-2.svg',
+}
+
+const DELIVERY_OPTIONS: { id: DeliveryMethodId; title: string; hint?: string }[] = [
+  { id: 'cdek', title: 'СДЭК', hint: 'Почтой СДЕК' },
+  { id: 'europost', title: 'Европочта', hint: 'Почтой ЕВРОПОЧТА' },
+  { id: 'yandex_courier', title: 'Яндекс Доставка', hint: 'Курьером' },
+]
+
+function deliveryMethodLabel(id: DeliveryMethodId): string {
+  const o = DELIVERY_OPTIONS.find((x) => x.id === id)
+  if (!o) return ''
+  return o.hint ? `${o.title} — ${o.hint}` : o.title
+}
 
 function StepAccordionHeader({
   step,
@@ -93,13 +119,12 @@ export function CheckoutPage() {
   const [lastName, setLastName] = useState('')
   const [firstName, setFirstName] = useState('')
   const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
+  const [phoneTel, setPhoneTel] = useState('')
   const [terms, setTerms] = useState(false)
+  const [step1SubmitAttempted, setStep1SubmitAttempted] = useState(false)
 
-  const [country, setCountry] = useState('')
-  const [city, setCity] = useState('')
-  const [postalCode, setPostalCode] = useState('')
-  const [addressLine, setAddressLine] = useState('')
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethodId | null>(null)
+  const [step2SubmitAttempted, setStep2SubmitAttempted] = useState(false)
 
   const [paymentMethod, setPaymentMethod] = useState<'apple_pay' | 'card' | 'cash' | null>(null)
 
@@ -113,8 +138,27 @@ export function CheckoutPage() {
     if (user?.email) setEmail(user.email)
   }, [user?.email])
 
-  const emailOk = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), [email])
-  const phoneOk = useMemo(() => phone.replace(/\D/g, '').length >= 10, [phone])
+  const emailOk = useMemo(
+    () => email.trim().length > 0 && contactEmailError(email) === null,
+    [email],
+  )
+  const emailFieldError = useMemo(
+    () => checkoutEmailFieldError(email, step1SubmitAttempted),
+    [email, step1SubmitAttempted],
+  )
+  const lastNameFieldError = useMemo(
+    () => (step1SubmitAttempted && !lastName.trim() ? 'Введите фамилию.' : null),
+    [step1SubmitAttempted, lastName],
+  )
+  const firstNameFieldError = useMemo(
+    () => (step1SubmitAttempted && !firstName.trim() ? 'Введите имя.' : null),
+    [step1SubmitAttempted, firstName],
+  )
+  const termsFieldError = useMemo(
+    () => (step1SubmitAttempted && !terms ? 'Подтвердите согласие с условиями.' : null),
+    [step1SubmitAttempted, terms],
+  )
+  const phoneOk = useMemo(() => isCompleteStoredPhoneDigits(phoneTel), [phoneTel])
   const step1Valid =
     lastName.trim().length > 0 &&
     firstName.trim().length > 0 &&
@@ -122,11 +166,11 @@ export function CheckoutPage() {
     phoneOk &&
     terms
 
-  const step2Valid =
-    country.trim().length > 0 &&
-    city.trim().length > 0 &&
-    postalCode.trim().length > 0 &&
-    addressLine.trim().length > 0
+  const step2Valid = deliveryMethod !== null
+  const step2FieldError = useMemo(
+    () => (step2SubmitAttempted && !deliveryMethod ? 'Выберите способ доставки.' : null),
+    [step2SubmitAttempted, deliveryMethod],
+  )
 
   const goStep = (s: CheckoutStep) => {
     if (s === 1) setOpenStep(1)
@@ -136,6 +180,7 @@ export function CheckoutPage() {
 
   const continueStep1 = (e: FormEvent) => {
     e.preventDefault()
+    setStep1SubmitAttempted(true)
     if (!step1Valid) return
     setStep1Done(true)
     setOpenStep(2)
@@ -143,6 +188,7 @@ export function CheckoutPage() {
 
   const continueStep2 = (e: FormEvent) => {
     e.preventDefault()
+    setStep2SubmitAttempted(true)
     if (!step2Valid) return
     setStep2Done(true)
     setOpenStep(3)
@@ -162,7 +208,9 @@ export function CheckoutPage() {
   if (lines.length === 0) {
     return (
       <div className="mx-auto max-w-lg pt-6 text-center sm:pt-10">
-        <h1 className="text-2xl font-semibold tracking-tight text-white">Оформление заказа</h1>
+        <h1 className="text-center text-2xl font-semibold tracking-tight text-white">
+          Оформление заказа
+        </h1>
         <p className="mt-3 text-gray-400">В корзине пока ничего нет.</p>
         <Link
           to="/catalog"
@@ -174,12 +222,12 @@ export function CheckoutPage() {
     )
   }
 
-  const contactSummary = `${lastName.trim()} ${firstName.trim()}, ${email.trim()}, ${phone.trim()}`
-  const addressSummary = `${country.trim()}, ${city.trim()}, ${postalCode.trim()}, ${addressLine.trim()}`
+  const contactSummary = `${lastName.trim()} ${firstName.trim()}, ${email.trim()}, ${formatPhoneForSummaryLine(phoneTel)}`
+  const deliverySummary = deliveryMethod ? deliveryMethodLabel(deliveryMethod) : undefined
 
   return (
     <div className="mx-auto max-w-6xl pt-6 sm:pt-10">
-      <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+      <h1 className="text-center text-2xl font-semibold tracking-tight text-white sm:text-left sm:text-3xl">
         Оформление заказа
       </h1>
 
@@ -361,7 +409,7 @@ export function CheckoutPage() {
         <section className="min-w-0 lg:pt-0">
           {!isAuthenticated ? (
             <div className="rounded-xl border border-white/10 bg-white/[0.03] px-6 py-10 text-center ring-1 ring-white/5">
-              <h2 className="text-lg font-semibold text-white">Оплата и контакты</h2>
+              <h2 className="text-center text-lg font-semibold text-white">Оплата и контакты</h2>
               <p className="mt-3 text-sm leading-relaxed text-gray-400">
                 Чтобы перейти к оформлению, войдите или зарегистрируйтесь.
               </p>
@@ -402,8 +450,15 @@ export function CheckoutPage() {
                               autoComplete="family-name"
                               value={lastName}
                               onChange={(e) => setLastName(e.target.value)}
-                              className={inputClass}
+                              aria-invalid={lastNameFieldError ? true : undefined}
+                              aria-describedby={lastNameFieldError ? 'checkout-lastname-error' : undefined}
+                              className={`${inputClass}${lastNameFieldError ? inputInvalidRingClass : ''}`}
                             />
+                            {lastNameFieldError ? (
+                              <p id="checkout-lastname-error" className="mt-1 text-xs text-red-400" role="alert">
+                                {lastNameFieldError}
+                              </p>
+                            ) : null}
                           </div>
                           <div>
                             <label htmlFor="checkout-firstname" className="block text-sm font-medium text-gray-300">
@@ -415,8 +470,15 @@ export function CheckoutPage() {
                               autoComplete="given-name"
                               value={firstName}
                               onChange={(e) => setFirstName(e.target.value)}
-                              className={inputClass}
+                              aria-invalid={firstNameFieldError ? true : undefined}
+                              aria-describedby={firstNameFieldError ? 'checkout-firstname-error' : undefined}
+                              className={`${inputClass}${firstNameFieldError ? inputInvalidRingClass : ''}`}
                             />
+                            {firstNameFieldError ? (
+                              <p id="checkout-firstname-error" className="mt-1 text-xs text-red-400" role="alert">
+                                {firstNameFieldError}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -431,42 +493,77 @@ export function CheckoutPage() {
                               autoComplete="email"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
-                              className={inputClass}
-                              placeholder="you@example.com"
+                              aria-invalid={emailFieldError ? true : undefined}
+                              aria-describedby={emailFieldError ? 'checkout-email-error' : undefined}
+                              className={`${inputClass}${emailFieldError ? inputInvalidRingClass : ''}`}
+                              placeholder="Введите почту"
                             />
+                            {emailFieldError ? (
+                              <p id="checkout-email-error" className="mt-1 text-xs text-red-400" role="alert">
+                                {emailFieldError}
+                              </p>
+                            ) : null}
                           </div>
                           <div>
                             <label htmlFor="checkout-phone" className="block text-sm font-medium text-gray-300">
                               Телефон
                             </label>
-                            <input
+                            <ContactPhoneField
                               id="checkout-phone"
-                              type="tel"
                               name="phone"
-                              autoComplete="tel"
-                              value={phone}
-                              onChange={(e) => setPhone(e.target.value)}
-                              className={inputClass}
-                              placeholder="+375 29 000-00-00"
+                              variant="storefront"
+                              valueTel={phoneTel}
+                              onDigitsChange={setPhoneTel}
+                              checkoutSubmitAttempted={step1SubmitAttempted}
                             />
                           </div>
                         </div>
-                        <div className="flex gap-3">
-                          <input
-                            id="checkout-terms"
-                            type="checkbox"
-                            checked={terms}
-                            onChange={(e) => setTerms(e.target.checked)}
-                            className="mt-1 size-4 shrink-0 rounded border-white/20 bg-white/5 text-indigo-500 ring-white/10 focus:ring-indigo-500"
-                          />
-                          <label htmlFor="checkout-terms" className="text-sm text-gray-300">
-                            Я ознакомился с условиями оферты и согласен на обработку персональных данных.
-                          </label>
+                        <div>
+                          <div
+                            className={`rounded-lg p-3 ring-1 ring-inset transition ${
+                              termsFieldError
+                                ? 'bg-red-500/[0.07] ring-red-500/50'
+                                : 'ring-transparent bg-transparent'
+                            }`}
+                          >
+                            <label htmlFor="checkout-terms" className="flex cursor-pointer gap-3">
+                              <span className="relative mt-0.5 inline-flex h-5 w-5 shrink-0">
+                                <input
+                                  id="checkout-terms"
+                                  type="checkbox"
+                                  checked={terms}
+                                  onChange={(e) => setTerms(e.target.checked)}
+                                  aria-invalid={termsFieldError ? true : undefined}
+                                  aria-describedby={termsFieldError ? 'checkout-terms-error' : undefined}
+                                  className="peer sr-only"
+                                />
+                                <span
+                                  aria-hidden
+                                  className={`pointer-events-none absolute inset-0 rounded-md border transition ${
+                                    termsFieldError
+                                      ? 'border-red-500/70 bg-white/[0.04]'
+                                      : 'border-white/25 bg-white/[0.06]'
+                                  } peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-[#0d1320] peer-checked:border-indigo-500 peer-checked:bg-indigo-600 peer-checked:shadow-[0_0_0_1px_rgba(99,102,241,0.35)]`}
+                                />
+                                <CheckIcon
+                                  aria-hidden
+                                  className="pointer-events-none absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 transition duration-150 peer-checked:opacity-100"
+                                />
+                              </span>
+                              <span className="min-w-0 text-sm leading-snug text-gray-300">
+                                Я ознакомился с условиями оферты и согласен на обработку персональных данных.
+                              </span>
+                            </label>
+                          </div>
+                          {termsFieldError ? (
+                            <p id="checkout-terms-error" className="mt-2 text-xs text-red-400" role="alert">
+                              {termsFieldError}
+                            </p>
+                          ) : null}
                         </div>
                         <button
                           type="submit"
-                          disabled={!step1Valid}
-                          className="w-full rounded-md bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="w-full rounded-md bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500"
                         >
                           Продолжить
                         </button>
@@ -478,8 +575,8 @@ export function CheckoutPage() {
                 <div>
                   <StepAccordionHeader
                     step={2}
-                    title="Подтвердите адрес доставки"
-                    summary={addressSummary}
+                    title="Выберите способ доставки"
+                    summary={deliverySummary}
                     unlocked={step1Done}
                     done={step2Done}
                     openStep={openStep}
@@ -489,67 +586,60 @@ export function CheckoutPage() {
                     className={`grid transition-[grid-template-rows] duration-300 ease-out ${openStep === 2 ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
                   >
                     <div className="overflow-hidden">
-                      <form
-                        onSubmit={continueStep2}
-                        className="grid grid-cols-1 gap-4 pb-6 sm:grid-cols-2"
-                      >
-                        <div>
-                          <label htmlFor="checkout-country" className="block text-sm font-medium text-gray-300">
-                            Страна
-                          </label>
-                          <input
-                            id="checkout-country"
-                            name="country"
-                            autoComplete="country-name"
-                            value={country}
-                            onChange={(e) => setCountry(e.target.value)}
-                            className={inputClass}
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="checkout-city" className="block text-sm font-medium text-gray-300">
-                            Город
-                          </label>
-                          <input
-                            id="checkout-city"
-                            name="address-level2"
-                            autoComplete="address-level2"
-                            value={city}
-                            onChange={(e) => setCity(e.target.value)}
-                            className={inputClass}
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="checkout-postal" className="block text-sm font-medium text-gray-300">
-                            Индекс
-                          </label>
-                          <input
-                            id="checkout-postal"
-                            name="postal-code"
-                            autoComplete="postal-code"
-                            value={postalCode}
-                            onChange={(e) => setPostalCode(e.target.value)}
-                            className={inputClass}
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="checkout-address" className="block text-sm font-medium text-gray-300">
-                            Адрес
-                          </label>
-                          <input
-                            id="checkout-address"
-                            name="street-address"
-                            autoComplete="street-address"
-                            value={addressLine}
-                            onChange={(e) => setAddressLine(e.target.value)}
-                            className={inputClass}
-                            placeholder="Улица, дом, квартира"
-                          />
-                        </div>
+                      <form onSubmit={continueStep2} className="space-y-4 pb-6">
+                        <fieldset>
+                          <legend className="sr-only">Способ доставки</legend>
+                          <div
+                            className={`grid grid-cols-1 gap-3 sm:grid-cols-3 ${
+                              step2FieldError ? 'rounded-lg p-1 ring-2 ring-red-500/50 ring-inset' : ''
+                            }`}
+                            role="radiogroup"
+                            aria-invalid={step2FieldError ? true : undefined}
+                            aria-describedby={step2FieldError ? 'checkout-delivery-error' : undefined}
+                          >
+                            {DELIVERY_OPTIONS.map((opt) => {
+                              const selected = deliveryMethod === opt.id
+                              return (
+                                <label
+                                  key={opt.id}
+                                  className={`flex cursor-pointer flex-col rounded-lg px-4 py-4 text-left ring-2 ring-inset transition ${
+                                    selected
+                                      ? 'bg-indigo-600/25 text-white ring-indigo-500'
+                                      : 'bg-white/5 text-gray-200 ring-white/15 hover:bg-white/10'
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="checkout-delivery"
+                                    value={opt.id}
+                                    checked={selected}
+                                    onChange={() => setDeliveryMethod(opt.id)}
+                                    className="sr-only"
+                                  />
+                                  <img
+                                    src={DELIVERY_LOGO[opt.id]}
+                                    alt={opt.hint ? `${opt.title}, ${opt.hint}` : opt.title}
+                                    width={240}
+                                    height={30}
+                                    decoding="async"
+                                    className="mb-2 h-8 w-full max-w-full object-contain object-left sm:h-9"
+                                  />
+                                  {opt.hint ? (
+                                    <span className="text-xs font-normal text-gray-400">{opt.hint}</span>
+                                  ) : null}
+                                </label>
+                              )
+                            })}
+                          </div>
+                        </fieldset>
+                        {step2FieldError ? (
+                          <p id="checkout-delivery-error" className="text-xs text-red-400" role="alert">
+                            {step2FieldError}
+                          </p>
+                        ) : null}
                         <button
                           type="submit"
-                          disabled={!step2Valid}
-                          className="col-span-full w-full rounded-md bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="w-full rounded-md bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500"
                         >
                           Продолжить
                         </button>
@@ -651,7 +741,7 @@ export function CheckoutPage() {
             </button>
             <div className="flex flex-col items-center text-center">
               <BulaiLogo className="h-8 w-auto text-violet-400" />
-              <DialogTitle className="mt-6 text-xl font-bold tracking-tight text-white">
+              <DialogTitle className="mt-6 text-center text-xl font-bold tracking-tight text-white">
                 Спасибо за покупку!
               </DialogTitle>
               <p className="mt-3 text-sm leading-6 text-gray-300">

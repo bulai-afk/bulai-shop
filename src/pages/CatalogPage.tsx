@@ -33,21 +33,24 @@ import {
   PlusIcon,
   Squares2X2Icon,
 } from '@heroicons/react/20/solid'
-import { Link, useSearchParams } from 'react-router-dom'
-import { CatalogPriceLabel } from '../components/CatalogPriceLabel'
+import { useSearchParams } from 'react-router-dom'
+import { CatalogProductCard } from '../components/CatalogProductCard'
+import { WriteReviewDialog } from '../components/WriteReviewDialog'
 import { PanelScrollArea } from '../components/PanelScrollArea'
 import { catalogFiltersPinnedScrollbarRailClass } from '../components/scrollbarShared'
+import { useCatalogInventory } from '../context/CatalogInventoryContext'
 import { useMainScrollbarSuppression } from '../context/MainScrollbarSuppressionContext'
 import { getPageScrollElement } from '../utils/getPageScrollElement'
 
+import { CATALOG_KEY_DETAILS_SLUG_ORDER } from '../constants/catalogCategoryPromo'
+import { useStorefrontPromoMaterials } from '../context/StorefrontSettingsContext'
 import {
-  products,
-  META_BY_ID,
   parseCategoriesFromQueryParam,
   categoriesToQueryParam,
   type ProductMeta,
   type CategoryOption,
 } from '../data/catalogProducts'
+import { categoryVisualBySlug } from '../utils/categoryVisualsStorefront'
 import { MOCK_CATALOG_REVIEWS } from '../data/mockCatalogReviews'
 
 const CATEGORY_OPTIONS: CategoryOption[] = ['новинки', 'майки', 'рубашки', 'брюки']
@@ -80,20 +83,25 @@ const CatalogProductsBar = memo(function CatalogProductsBar({
   sortBy,
   onSortChange,
   onMobileFiltersOpen,
+  gridDense,
+  onToggleGridDensity,
 }: {
   sortBy: SortOption
   onSortChange: (v: SortOption) => void
   onMobileFiltersOpen: () => void
+  /** true: 2 колонки на телефоне, 4 на ПК; false: 1 и 2 соответственно */
+  gridDense: boolean
+  onToggleGridDensity: () => void
 }) {
   return (
     <div className="relative z-10 shrink-0 border-b border-white/10 bg-gray-900">
-      <div className="flex h-16 items-center justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+      <div className="flex h-16 items-center justify-between gap-4 sm:gap-5 lg:h-[4.25rem] lg:gap-8">
+        <div className="min-w-0 flex-1 sm:flex-none lg:min-w-[12rem]">
+          <h1 className="text-center text-2xl font-semibold tracking-tight text-white sm:text-left sm:text-3xl">
             Каталог товаров
           </h1>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
           <Menu as="div" className="relative inline-block text-left">
             <MenuButton
               type="button"
@@ -125,15 +133,43 @@ const CatalogProductsBar = memo(function CatalogProductsBar({
 
           <button
             type="button"
-            className="-m-2 ml-3 p-2 text-gray-400 hover:bg-white/5 hover:text-white lg:hidden sm:ml-4"
+            aria-pressed={gridDense}
+            aria-label={
+              gridDense
+                ? 'Показать крупнее: одна карточка в ряд на телефоне, две на ПК'
+                : 'Показать сеткой: две карточки на телефоне, четыре на ПК'
+            }
+            title={gridDense ? 'Крупные карточки' : 'Плотная сетка'}
+            onClick={onToggleGridDensity}
+            className="-m-2 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-2 text-indigo-400 outline-none transition-colors hover:text-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 [text-shadow:0_0_14px_rgba(129,140,248,0.45)] hover:[text-shadow:0_0_18px_rgba(165,180,252,0.55)]"
           >
-            <span className="sr-only">Показать сетку</span>
-            <Squares2X2Icon aria-hidden className="size-5" />
+            <span className="sr-only">
+              {gridDense ? 'Переключить на крупные карточки' : 'Переключить на плотную сетку'}
+            </span>
+            {gridDense ? (
+              <Squares2X2Icon aria-hidden className="size-5" />
+            ) : (
+              <>
+                <span
+                  aria-hidden
+                  className="flex size-5 items-center justify-center lg:hidden"
+                >
+                  <span className="size-[14px] rounded-[3px] bg-indigo-400 ring-1 ring-indigo-300/60 shadow-[0_0_10px_rgba(129,140,248,0.75),0_0_18px_rgba(129,140,248,0.4)]" />
+                </span>
+                <span
+                  aria-hidden
+                  className="hidden size-5 items-center justify-center gap-0.5 lg:inline-flex"
+                >
+                  <span className="size-2 rounded-[2px] bg-current opacity-95 shadow-[0_0_8px_rgba(129,140,248,0.55)]" />
+                  <span className="size-2 rounded-[2px] bg-current opacity-95 shadow-[0_0_8px_rgba(129,140,248,0.55)]" />
+                </span>
+              </>
+            )}
           </button>
           <button
             type="button"
             onClick={onMobileFiltersOpen}
-            className="-m-2 ml-3 p-2 text-gray-400 hover:bg-white/5 hover:text-white sm:ml-4 lg:hidden"
+            className="-m-2 p-2 text-gray-400 hover:bg-white/5 hover:text-white lg:hidden"
           >
             <span className="sr-only">Открыть фильтры</span>
             <FunnelIcon aria-hidden className="size-5" />
@@ -145,6 +181,8 @@ const CatalogProductsBar = memo(function CatalogProductsBar({
 })
 
 export function CatalogPage() {
+  const { products, metaById } = useCatalogInventory()
+  const { catalogKeyDetailsSection, categoryVisuals } = useStorefrontPromoMaterials()
   const getScroller = () => getPageScrollElement()
 
   const lastVisibleCardRef = useRef<HTMLLIElement | null>(null)
@@ -156,8 +194,17 @@ export function CatalogPage() {
     Object.fromEntries(products.map((product) => [product.id, product.colors[0]?.name ?? ''])),
   )
 
+  useEffect(() => {
+    setActiveColorByProduct(
+      Object.fromEntries(products.map((product) => [product.id, product.colors[0]?.name ?? ''])),
+    )
+  }, [products])
+
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  const [catalogGridDense, setCatalogGridDense] = useState(true)
+  const toggleCatalogGridDensity = useCallback(() => setCatalogGridDense((d) => !d), [])
   const [reviewStarsFilter, setReviewStarsFilter] = useState<number | null>(null)
+  const [writeReviewOpen, setWriteReviewOpen] = useState(false)
   const [productPanelAtBottom, setProductPanelAtBottom] = useState(false)
   /** Удерживает «низ панели» после кратких false от гистерезиса — иначе основной скроллбар мигает. */
   const [productPanelAtBottomDebounced, setProductPanelAtBottomDebounced] = useState(false)
@@ -329,7 +376,7 @@ export function CatalogPage() {
 
   const allColors = useMemo(
     () => Array.from(new Set(products.flatMap((product) => product.colors.map((color) => color.name)))),
-    [],
+    [products],
   )
 
   const filteredProducts = useMemo(() => {
@@ -337,7 +384,7 @@ export function CatalogPage() {
     const to = priceTo.trim() === '' ? null : Number(priceTo)
 
     const base = products.filter((product) => {
-      const meta = META_BY_ID[product.id]
+      const meta = metaById[product.id]
       if (!meta) return false
 
       const productPrice = Number(product.price.replace(/[^\d]/g, ''))
@@ -377,7 +424,20 @@ export function CatalogPage() {
       sorted.sort((a, b) => b.reviews - a.reviews)
     }
     return sorted
-  }, [categories, sizes, colors, priceFrom, priceTo, fit, material, season, inStockOnly, sortBy])
+  }, [
+    products,
+    metaById,
+    categories,
+    sizes,
+    colors,
+    priceFrom,
+    priceTo,
+    fit,
+    material,
+    season,
+    inStockOnly,
+    sortBy,
+  ])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -438,15 +498,19 @@ export function CatalogPage() {
 
   return (
     <section className="pt-0">
-      <Dialog open={mobileFiltersOpen} onClose={setMobileFiltersOpen} className="relative z-[80] lg:hidden">
+      <Dialog
+        open={mobileFiltersOpen}
+        onClose={setMobileFiltersOpen}
+        className="relative z-[210] lg:hidden"
+      >
         <DialogBackdrop
           transition
-          className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-linear data-closed:opacity-0"
+          className="fixed inset-0 z-[210] bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-linear data-closed:opacity-0"
         />
-        <div className="fixed inset-0 z-[80] flex">
+        <div className="fixed inset-0 z-[210] flex">
           <DialogPanel
             transition
-            className="relative ml-auto flex h-full w-full max-w-xs transform flex-col overflow-y-auto bg-[#0d1b2a] pt-4 pb-6 shadow-xl ring-1 ring-white/10 transition duration-300 ease-in-out data-closed:translate-x-full"
+            className="relative z-[211] ml-auto flex h-full w-full max-w-xs transform flex-col overflow-y-auto bg-[#0d1b2a] pt-4 pb-6 shadow-xl ring-1 ring-white/10 transition duration-300 ease-in-out data-closed:translate-x-full"
           >
             <div className="flex items-center justify-between px-4">
               <h2 className="text-lg font-semibold text-white">Фильтра</h2>
@@ -700,7 +764,7 @@ export function CatalogPage() {
         </div>
       </Dialog>
 
-      <div className="mx-[calc(50%-50vw)] mt-0 w-screen px-4 pt-0 sm:px-6 lg:px-8">
+      <div className="mt-0 w-full min-w-0 px-4 pt-0 sm:px-6 lg:px-8">
 
         <section
           aria-labelledby="products-heading"
@@ -710,16 +774,18 @@ export function CatalogPage() {
             sortBy={sortBy}
             onSortChange={setSortBy}
             onMobileFiltersOpen={() => setMobileFiltersOpen(true)}
+            gridDense={catalogGridDense}
+            onToggleGridDensity={toggleCatalogGridDensity}
           />
 
           <h2 id="products-heading" className="sr-only">
             Товары
           </h2>
 
-          <div className="grid min-h-0 flex-1 auto-rows-[minmax(0,1fr)] grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-4 lg:items-stretch lg:gap-y-0">
+          <div className="grid min-h-0 flex-1 auto-rows-[minmax(0,1fr)] grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-4 lg:items-stretch lg:gap-x-10 lg:gap-y-0 xl:gap-x-12">
             <PanelScrollArea
-              className="hidden min-h-0 h-full max-h-full lg:block"
-              viewportClassName="pr-1"
+              className="relative z-40 hidden min-h-0 h-full max-h-full lg:block"
+              viewportClassName="pr-1 lg:pt-1 lg:pr-2"
               pinRailToViewport
               pinnedRailClassName={catalogFiltersPinnedScrollbarRailClass}
               propagateWheelToPage={false}
@@ -727,7 +793,7 @@ export function CatalogPage() {
               innerScrollEnabled={catalogInnerScrollEnabled}
               debugScrollLabel="catalog-filters"
             >
-              <form className="pr-2">
+              <form className="pr-2 lg:pr-4">
               <h3 className="sr-only">Фильтры</h3>
 
               <div className="border-b border-white/10 py-6">
@@ -972,8 +1038,8 @@ export function CatalogPage() {
             </PanelScrollArea>
 
             <PanelScrollArea
-              className="min-h-0 h-full max-h-full lg:col-span-3"
-              viewportClassName="pt-4 pb-4 pr-2 sm:pr-3"
+              className="relative z-0 min-h-0 h-full max-h-full lg:col-span-3"
+              viewportClassName="pt-4 pb-4 px-2 sm:px-3 lg:pl-2 lg:pr-4 lg:pt-5 lg:pb-8"
               pinRailToViewport
               onBottomEdgeChange={setProductPanelAtBottom}
               onOverflowChange={setProductPanelOverflow}
@@ -981,11 +1047,14 @@ export function CatalogPage() {
               innerScrollEnabled={catalogInnerScrollEnabled}
               debugScrollLabel="catalog-products"
             >
-              <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              <ul
+                className={classNames(
+                  'grid gap-5 lg:gap-x-6 lg:gap-y-8',
+                  catalogGridDense ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 lg:grid-cols-2',
+                )}
+              >
           {visibleProducts.map((product, idx) => {
-            const activeColor = activeColorByProduct[product.id]
-            const activeSwatch = product.colors.find((color) => color.name === activeColor)
-            const meta = META_BY_ID[product.id]
+            const meta = metaById[product.id]
             const isLast = idx === visibleProducts.length - 1
 
             return (
@@ -994,116 +1063,15 @@ export function CatalogPage() {
                 ref={isLast ? lastVisibleCardRef : null}
                 className="group min-w-0"
               >
-              <article className="rounded-2xl">
-                <div className="relative">
-                  <div className="overflow-hidden rounded-2xl">
-                    <img
-                      src={activeSwatch?.image ?? product.image}
-                      alt={`${product.name}, цвет ${activeSwatch?.name ?? ''}`}
-                      className="aspect-[4/5] w-full object-cover transition duration-300 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-90" />
-                    <p
-                      className={`absolute top-3 right-3 rounded-md px-2.5 py-1 text-xs font-semibold ${
-                        meta?.inStock ? 'bg-emerald-500/85 text-white' : 'bg-rose-500/85 text-white'
-                      }`}
-                    >
-                      {meta?.inStock ? 'В наличии' : 'Нет в наличии'}
-                    </p>
-                    <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-                      {product.sizes.map((size) => (
-                        <span
-                          key={size}
-                          className="inline-flex min-w-8 items-center justify-center rounded-md bg-black/70 px-2 py-1 text-center text-[11px] font-semibold tracking-wide text-white"
-                        >
-                          {size}
-                        </span>
-                      ))}
-                    </div>
-                    {meta?.isNew ? (
-                      <p className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md bg-indigo-500/90 px-2.5 py-1 text-xs font-semibold text-white shadow-md">
-                        Новинка
-                      </p>
-                    ) : null}
-                    <div className="absolute bottom-3 right-3 max-w-[calc(100%-1.5rem)]">
-                      <CatalogPriceLabel
-                        price={product.price}
-                        oldPrice={product.oldPrice}
-                        discount={product.discount}
-                      />
-                    </div>
-                  </div>
-                  <div className="absolute bottom-0 left-1/2 z-30 flex -translate-x-1/2 translate-y-1/2 items-center gap-2">
-                    {product.colors.map((color) => (
-                      <button
-                        key={color.name}
-                        type="button"
-                        aria-label={color.name}
-                        aria-pressed={activeColorByProduct[product.id] === color.name}
-                        onClick={() =>
-                          setActiveColorByProduct((prev) => ({ ...prev, [product.id]: color.name }))
-                        }
-                        className={`h-5 w-5 rounded-full border border-white/90 ${color.className} transition ${
-                          activeColorByProduct[product.id] === color.name
-                            ? 'shadow-[0_0_0_2px_rgba(129,140,248,0.95),0_0_14px_rgba(129,140,248,0.75)]'
-                            : 'shadow-none'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <h2 className="text-center text-base font-semibold text-gray-100">{product.name}</h2>
-
-                  <div className="mt-2">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="flex items-center gap-0.5" aria-label={`Рейтинг ${product.rating} из 5`}>
-                        {[1, 2, 3, 4, 5].map((star) => {
-                          const roundedRating = Math.round(product.rating * 2) / 2
-                          const isFull = roundedRating >= star
-                          const isHalf = !isFull && roundedRating + 0.5 === star
-
-                          if (isFull) {
-                            return (
-                              <span key={star} aria-hidden className="text-amber-300">
-                                ★
-                              </span>
-                            )
-                          }
-
-                          if (isHalf) {
-                            return (
-                              <span key={star} aria-hidden className="relative inline-block text-gray-600">
-                                ★
-                                <span className="absolute inset-y-0 left-0 w-1/2 overflow-hidden text-amber-300">
-                                  ★
-                                </span>
-                              </span>
-                            )
-                          }
-
-                          return (
-                            <span key={star} aria-hidden className="text-gray-600">
-                              ★
-                            </span>
-                          )
-                        })}
-                      </div>
-                      <span className="text-sm font-medium text-gray-200">{product.rating.toFixed(1)}</span>
-                    </div>
-                    <p className="mt-1 text-center text-sm text-gray-500">Оценок: {product.reviews}</p>
-                  </div>
-
-                  <Link
-                    to={`/product/${product.id}`}
-                    className="mt-4 flex w-full items-center justify-center rounded-lg bg-slate-700/65 px-4 py-2.5 text-sm font-semibold text-gray-100 transition hover:bg-slate-600/75"
-                  >
-                    Перейти к товару
-                  </Link>
-                </div>
-              </article>
-            </li>
+                <CatalogProductCard
+                  product={product}
+                  meta={meta}
+                  activeColorName={activeColorByProduct[product.id]}
+                  onPickColor={(colorName) =>
+                    setActiveColorByProduct((prev) => ({ ...prev, [product.id]: colorName }))
+                  }
+                />
+              </li>
             )
           })}
               </ul>
@@ -1155,99 +1123,70 @@ export function CatalogPage() {
         >
           <div className="w-full overflow-hidden rounded-lg">
             <div className="px-4 py-10 sm:px-6 lg:px-8">
-              <div className="max-w-2xl">
+              <div className="mx-auto max-w-2xl text-center sm:text-left">
                 <h2 id="features-heading" className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                  Ключевые характеристики
+                  {catalogKeyDetailsSection.heading}
                 </h2>
-                <p className="mt-4 text-gray-300">
-                  Коротко и по делу: материалы, пошив и посадка — то, что важно при выборе одежды.
-                </p>
+                <p className="mt-4 text-gray-300">{catalogKeyDetailsSection.lead}</p>
               </div>
 
               <TabGroup className="mt-8 block">
                 <div className="-mx-4 flex overflow-x-auto sm:mx-0">
                   <div className="flex-auto border-b border-white/10 px-4 sm:px-0">
                     <TabList className="-mb-px flex space-x-10">
-                      {['Рубашки', 'Майки', 'Брюки'].map((label) => (
-                        <Tab
-                          key={label}
-                          className={({ selected }) =>
-                            classNames(
-                              'whitespace-nowrap border-b-2 px-1 py-6 text-sm font-medium outline-none transition',
-                              selected
-                                ? 'border-indigo-400 text-indigo-300'
-                                : 'border-transparent text-gray-400 hover:border-white/20 hover:text-gray-200',
-                            )
-                          }
-                        >
-                          {label}
-                        </Tab>
-                      ))}
+                      {CATALOG_KEY_DETAILS_SLUG_ORDER.map((slug) => {
+                        const row = categoryVisualBySlug(categoryVisuals, slug)
+                        const label = row?.displayName ?? slug
+                        return (
+                          <Tab
+                            key={slug}
+                            className={({ selected }) =>
+                              classNames(
+                                'whitespace-nowrap border-b-2 px-1 py-6 text-sm font-medium outline-none transition',
+                                selected
+                                  ? 'border-indigo-400 text-indigo-300'
+                                  : 'border-transparent text-gray-400 hover:border-white/20 hover:text-gray-200',
+                              )
+                            }
+                          >
+                            {label}
+                          </Tab>
+                        )
+                      })}
                     </TabList>
                   </div>
                 </div>
 
                 <TabPanels>
-                  <TabPanel className="pt-10 outline-none">
-                    <div className="flex flex-col-reverse gap-10 lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-8">
-                      <div className="lg:col-span-5">
-                        <h3 className="text-lg font-medium text-white">Рубашки: натуральные ткани и чистая посадка</h3>
-                        <p className="mt-2 text-sm text-gray-300">
-                          Для рубашек выбираем комфортные составы: 100% лён, хлопок, вискоза. Ткань “дышит”,
-                          держит форму и выглядит аккуратно в течение дня. Пошив заводской — ровная строчка,
-                          аккуратные швы и чистая обработка деталей.
-                        </p>
-                      </div>
-                      <div className="lg:col-span-7">
-                        <img
-                          src="https://tailwindcss.com/plus-assets/img/ecommerce-images/product-feature-06-detail-01.jpg"
-                          alt="Рубашки: ткань и обработка деталей."
-                          className="aspect-[5/2] w-full rounded-lg bg-white/5 object-cover"
-                        />
-                      </div>
-                    </div>
-                  </TabPanel>
-
-                  <TabPanel className="pt-10 outline-none">
-                    <div className="flex flex-col-reverse gap-10 lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-8">
-                      <div className="lg:col-span-5">
-                        <h3 className="text-lg font-medium text-white">Майки: лёгкость и универсальность</h3>
-                        <p className="mt-2 text-sm text-gray-300">
-                          База на каждый день: мягкие, приятные к телу материалы (лён/хлопок/вискоза),
-                          которые комфортно носятся и хорошо сочетаются с любыми низами. Универсальный
-                          размерный ряд и свободная посадка помогают собрать оверсайз-образ без лишних усилий.
-                        </p>
-                      </div>
-                      <div className="lg:col-span-7">
-                        <img
-                          src="https://tailwindcss.com/plus-assets/img/ecommerce-images/product-feature-06-detail-02.jpg"
-                          alt="Майки: посадка и фактура ткани."
-                          className="aspect-[5/2] w-full rounded-lg bg-white/5 object-cover"
-                        />
-                      </div>
-                    </div>
-                  </TabPanel>
-
-                  <TabPanel className="pt-10 outline-none">
-                    <div className="flex flex-col-reverse gap-10 lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-8">
-                      <div className="lg:col-span-5">
-                        <h3 className="text-lg font-medium text-white">Брюки: посадка, которая работает</h3>
-                        <p className="mt-2 text-sm text-gray-300">
-                          Удобный крой и продуманные посадки для повседневной носки. Материалы подбираем
-                          практичные и комфортные (хлопок/деним/смесовые), пошив заводской — рассчитан на
-                          активный ритм. Универсальный размерный ряд и оверсайз-силуэт (где уместно) дают
-                          свободу движений и современный вид.
-                        </p>
-                      </div>
-                      <div className="lg:col-span-7">
-                        <img
-                          src="https://tailwindcss.com/plus-assets/img/ecommerce-images/product-feature-06-detail-03.jpg"
-                          alt="Брюки: крой и посадка."
-                          className="aspect-[5/2] w-full rounded-lg bg-white/5 object-cover"
-                        />
-                      </div>
-                    </div>
-                  </TabPanel>
+                  {CATALOG_KEY_DETAILS_SLUG_ORDER.map((slug) => {
+                    const row = categoryVisualBySlug(categoryVisuals, slug)
+                    const title = row?.keyDetailsTitle ?? ''
+                    const body = row?.keyDetailsBody ?? ''
+                    const img = row?.imageKeyDetails ?? ''
+                    return (
+                      <TabPanel key={slug} className="pt-10 outline-none">
+                        <div className="flex flex-col-reverse gap-10 lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-8">
+                          <div className="lg:col-span-5">
+                            <h3 className="text-lg font-medium text-white">{title}</h3>
+                            <p className="mt-2 whitespace-pre-wrap text-sm text-gray-300">{body}</p>
+                          </div>
+                          <div className="lg:col-span-7">
+                            {img ? (
+                              <img
+                                src={img}
+                                alt={title}
+                                className="aspect-[5/2] w-full rounded-lg bg-white/5 object-cover"
+                              />
+                            ) : (
+                              <div className="flex aspect-[5/2] w-full items-center justify-center rounded-lg bg-white/5 text-sm text-gray-500">
+                                Добавьте фото в промо «Каталог»
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TabPanel>
+                    )
+                  })}
                 </TabPanels>
               </TabGroup>
             </div>
@@ -1292,9 +1231,14 @@ export function CatalogPage() {
                 return (
                   <div className="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-8">
                     <div ref={reviewsSidebarRef} className="lg:col-span-4">
-                      <h2 id="reviews-heading" className="text-2xl font-bold tracking-tight text-white">
-                        Отзывы покупателей
-                      </h2>
+                      <div className="w-full text-center lg:text-left">
+                        <h2
+                          id="reviews-heading"
+                          className="text-2xl font-bold tracking-tight text-white"
+                        >
+                          Отзывы покупателей
+                        </h2>
+                      </div>
 
                       <div className="mt-3 flex items-center">
                         <div>
@@ -1406,12 +1350,13 @@ export function CatalogPage() {
                         <p className="mt-1 text-sm text-gray-300">
                           Если вы покупали у нас, оставьте отзыв — это помогает другим выбрать.
                         </p>
-                        <a
-                          href="#"
-                          className="mt-6 block w-full rounded-lg bg-slate-700/65 px-4 py-2.5 text-center text-sm font-semibold text-gray-100 transition hover:bg-slate-600/75"
+                        <button
+                          type="button"
+                          onClick={() => setWriteReviewOpen(true)}
+                          className="mt-6 w-full rounded-lg bg-slate-700/65 px-4 py-2.5 text-center text-sm font-semibold text-gray-100 transition hover:bg-slate-600/75"
                         >
                           Написать отзыв
-                        </a>
+                        </button>
                       </div>
                     </div>
 
@@ -1469,6 +1414,8 @@ export function CatalogPage() {
             </div>
           </div>
         </section>
+
+        <WriteReviewDialog open={writeReviewOpen} onClose={() => setWriteReviewOpen(false)} />
       </div>
     </section>
   )

@@ -9,6 +9,8 @@ interface ImportMetaEnv {
    * Пример: https://api.example.com/yandex/user (должен проксировать на login.yandex.ru/info).
    */
   readonly VITE_YANDEX_INFO_URL?: string
+  /** Базовый URL бэкенда без слэша, напр. http://127.0.0.1:3001 — для /api/site-config и др. */
+  readonly VITE_API_URL?: string
 }
 
 interface ImportMeta {

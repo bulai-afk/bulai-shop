@@ -51,6 +51,11 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/yandex-login-info/, '/info'),
       },
+      // Локальный бэкенд (site-config, promo-materials, …); поднимите API на :3001.
+      '/api': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+      },
     },
   },
 })

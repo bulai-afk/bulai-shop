@@ -1,40 +1,54 @@
-import type { SVGProps } from 'react'
+import { LinkIcon } from '@heroicons/react/24/outline'
+import { useStorefrontSiteConfig } from '../context/StorefrontSettingsContext'
+import { socialIconFromDraft } from '../utils/socialDraftIcons'
 
 type FooterProps = {
   variant?: 'dark' | 'light'
 }
 
-const social = [
-  {
-    name: 'VK',
-    href: '#',
-    icon: (props: SVGProps<SVGSVGElement>) => (
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden {...props}>
-        <path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C4.624 10.857 4.03 8.57 4.03 8.096c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.863 2.491 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.644v4.675c0 .373.17.508.271.508.22 0 .407-.136.813-.542 1.253-1.406 2.15-3.574 2.15-3.574.17-.254.322-.373.78-.373h1.744c.525 0 .644.27.525.644-.254 1.186-2.607 3.844-2.607 3.844-.203.254-.27.373 0 .644.203.254.88 1.033 1.338 1.744.372.593.744 1.033.744 1.338 0 .254-.136.491-.593.491z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Telegram',
-    href: '#',
-    icon: (props: SVGProps<SVGSVGElement>) => (
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden {...props}>
-        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 1.667-.715 2.01-1.05 2.242-1.05z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'YouTube',
-    href: '#',
-    icon: (props: SVGProps<SVGSVGElement>) => (
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden {...props}>
-        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-      </svg>
-    ),
-  },
-]
+function SocialLinksFromDraft({
+  iconClass,
+  wrapClassName,
+}: {
+  iconClass: string
+  /** Обёртка только если есть ссылки — чтобы не оставлять пустой ряд во футере */
+  wrapClassName?: string
+}) {
+  const site = useStorefrontSiteConfig()
+  const links = site.socialLinks.filter((l) => l.href.trim())
+  if (links.length === 0) return null
+  const inner = (
+    <>
+      {links.map((item) => {
+        const IconFn = socialIconFromDraft(item.id, item.name)
+        const href = item.href.trim()
+        const external = href.startsWith('http')
+        return (
+          <a
+            key={`${item.id}-${item.name}`}
+            href={href}
+            className={`${iconClass} transition`}
+            {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+          >
+            <span className="sr-only">{item.name}</span>
+            {IconFn ? (
+              <IconFn className="size-5" />
+            ) : (
+              <LinkIcon className="size-5" aria-hidden />
+            )}
+          </a>
+        )
+      })}
+    </>
+  )
+  if (wrapClassName) {
+    return <div className={wrapClassName}>{inner}</div>
+  }
+  return inner
+}
 
 export function Footer({ variant = 'light' }: FooterProps) {
+  const site = useStorefrontSiteConfig()
   const isDark = variant === 'dark'
 
   const shell = isDark
@@ -49,24 +63,26 @@ export function Footer({ variant = 'light' }: FooterProps) {
     ? 'text-gray-400 hover:text-gray-300'
     : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
 
+  const legalParts = site.footer.legalEntityLine
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const shopLine =
+    site.footer.shopNameLine.trim() ||
+    `© ${new Date().getFullYear()} Интернет-магазин bulai.by`
+
   return (
     <footer className={`border-t ${shell} overscroll-none`}>
-      <div className="mx-auto flex min-h-16 max-w-7xl flex-col items-center justify-center gap-4 px-6 py-4 md:h-20 md:flex-row md:justify-between md:gap-0 md:py-0 lg:px-8">
-        <div className="flex justify-center gap-x-5 md:order-2 md:shrink-0">
-          {social.map((item) => (
-            <a
-              key={item.name}
-              href={item.href}
-              className={`${iconClass} transition`}
-            >
-              <span className="sr-only">{item.name}</span>
-              <item.icon className="size-5" />
-            </a>
-          ))}
-        </div>
-        <div className="order-first md:order-1 md:min-w-0 md:pr-4">
-          <p className={`text-center text-xs leading-snug md:text-left ${textMuted}`}>
-            © {new Date().getFullYear()} Интернет-магазин bulai.by ИП Булыга Александр Игоревич
+      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        <div
+          className={`flex flex-col items-center gap-3 py-4 text-center ${textMuted}`}
+        >
+          <SocialLinksFromDraft
+            iconClass={iconClass}
+            wrapClassName="flex justify-center gap-x-5"
+          />
+          <p className="max-w-3xl px-2 text-xs leading-snug">
+            {legalParts.length > 0 ? `${shopLine} — ${legalParts.join(', ')}` : shopLine}
           </p>
         </div>
       </div>

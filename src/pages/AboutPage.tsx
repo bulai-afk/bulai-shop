@@ -10,23 +10,14 @@ import {
 } from '@heroicons/react/24/outline'
 import { useId, type ComponentType, type SVGProps } from 'react'
 import { Link } from 'react-router-dom'
+import type { PromoValueIconId } from '../admin/types/siteSettings'
+import { useStorefrontPromoMaterials } from '../context/StorefrontSettingsContext'
 import { BulaiLogo } from '../components/BulaiLogo'
 
 type ValueIcon = ComponentType<SVGProps<SVGSVGElement>>
 
 const HERO_BLOB_CLIP =
   'polygon(63.1% 29.5%, 100% 17.1%, 76.6% 3%, 48.4% 0%, 44.6% 4.7%, 54.5% 25.3%, 59.8% 49%, 55.2% 57.8%, 44.4% 57.2%, 27.8% 47.9%, 35.1% 81.5%, 0% 97.7%, 39.2% 100%, 35.2% 81.4%, 97.2% 52.8%, 63.1% 29.5%)'
-
-const HERO_IMAGES = {
-  a: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?ixlib=rb-4.0.3&auto=format&fit=crop&h=528&q=80',
-  b: 'https://images.unsplash.com/photo-1485217988980-11786ced9454?ixlib=rb-4.0.3&auto=format&fit=crop&h=528&q=80',
-  c: 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?ixlib=rb-4.0.3&auto=format&fit=crop&crop=focalpoint&fp-x=.4&w=396&h=528&q=80',
-  d: 'https://images.unsplash.com/photo-1670272504528-790c24957dda?ixlib=rb-4.0.3&auto=format&fit=crop&crop=left&w=400&h=528&q=80',
-  e: 'https://images.unsplash.com/photo-1670272505284-8faba1c31f7d?ixlib=rb-4.0.3&auto=format&fit=crop&h=528&q=80',
-} as const
-
-const BANNER_IMG =
-  'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?ixlib=rb-4.0.3&auto=format&fit=crop&w=2832&q=80'
 
 const CONTACT_EMAIL = 'hello@example.com'
 const CONTACT_PHONE_DISPLAY = '+7 (000) 000-00-00'
@@ -72,42 +63,19 @@ const CONTACT_SOCIAL: { name: string; href: string; Icon: ComponentType<SVGProps
   },
 ]
 
-const VALUES: { title: string; text: string; Icon: ValueIcon }[] = [
-  {
-    title: 'Быть лучшими в своём деле',
-    text: 'Качество пошива, честные материалы и внимание к деталям — то, за что нас выбирают. Мы не идём на компромиссы там, где это заметно в носке.',
-    Icon: SparklesIcon,
-  },
-  {
-    title: 'Делиться опытом',
-    text: 'Рассказываем о составах, посадке и уходе за вещами — чтобы вы покупали осознанно и носили дольше.',
-    Icon: ShareIcon,
-  },
-  {
-    title: 'Постоянно учиться',
-    text: 'Следим за трендами и обратной связью клиентов, обновляем каталог и улучшаем сервис.',
-    Icon: AcademicCapIcon,
-  },
-  {
-    title: 'Поддерживать',
-    text: 'Помогаем с размером, доставкой и возвратом. Команда поддержки на связи, если что-то пошло не так.',
-    Icon: LifebuoyIcon,
-  },
-  {
-    title: 'Брать ответственность',
-    text: 'Признаём ошибки и исправляем их. Прозрачные условия заказа и оплаты — без сюрпризов.',
-    Icon: ShieldCheckIcon,
-  },
-  {
-    title: 'Ценить отдых',
-    text: 'Сбалансированный ритм команды — залог вдумчивых решений и тёплого общения с вами.',
-    Icon: MoonIcon,
-  },
-]
+const VALUE_ICONS: Record<PromoValueIconId, ValueIcon> = {
+  sparkles: SparklesIcon,
+  share: ShareIcon,
+  academic: AcademicCapIcon,
+  lifebuoy: LifebuoyIcon,
+  shield: ShieldCheckIcon,
+  moon: MoonIcon,
+}
 
 const IMG_OVERLAY = 'pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10'
 
 export function AboutPage() {
+  const { aboutHero, aboutMission, aboutValues } = useStorefrontPromoMaterials()
   const uid = useId().replace(/:/g, '')
   const heroPatternId = `about-hero-grid-${uid}`
   const logoPatternId = `about-logo-grid-${uid}`
@@ -152,50 +120,47 @@ export function AboutPage() {
           />
         </div>
 
-        <div className="mx-auto max-w-7xl px-6 pb-20 pt-10 sm:pb-28 sm:pt-12 lg:flex lg:items-center lg:gap-x-12 lg:px-8 lg:pt-14 lg:pb-24 xl:gap-x-16">
+        <div className="mx-auto flex max-w-7xl flex-col-reverse gap-y-10 px-6 pb-20 pt-10 sm:gap-y-14 sm:pb-28 sm:pt-12 lg:flex-row lg:items-center lg:gap-x-12 lg:gap-y-0 lg:px-8 lg:pt-14 lg:pb-24 xl:gap-x-16">
           <div className="mx-auto max-w-2xl flex-shrink-0 lg:mx-0 lg:max-w-xl">
-            <div className="mt-5 sm:mt-12 lg:mt-0">
-              <h1 className="text-pretty text-5xl font-semibold tracking-tight text-white sm:text-7xl">
-                Мы делаем ваш образ удобным
+            <div className="text-center lg:mt-0 lg:text-left">
+              <h1 className="text-pretty text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+                {aboutHero.title}
               </h1>
-              <p className="mt-8 text-pretty text-lg font-medium text-gray-400 sm:text-xl/8">
-                BULAI — это удобная и стильная одежда из качественных материалов: лён, хлопок, вискоза и другие ткани,
-                подобранные с заботой об экологии и комфорте к телу. Комфортный крой и лаконичный дизайн — чтобы образ
-                собирался быстро и смотрелся дорого без лишних усилий. Честные описания и аккуратный пошив — чтобы вы
-                носили вещи долго и с удовольствием, а не «на один сезон».
+              <p className="mt-6 text-pretty text-base/7 text-gray-300 lg:mt-8">
+                {aboutHero.description}
               </p>
             </div>
           </div>
 
           {/* Три колонки со смещением вверх/вниз (шахматная раскладка), фиксированные ширины — без w-auto */}
-          <div className="mt-10 w-full min-w-0 shrink-0 sm:mt-14 lg:mt-0 lg:max-w-xl lg:flex-1 xl:max-w-2xl">
+          <div className="w-full min-w-0 shrink-0 lg:max-w-xl lg:flex-1 xl:max-w-2xl">
             <div className="mx-auto flex max-w-md items-start justify-center gap-2.5 sm:max-w-lg sm:gap-4 lg:mx-0 lg:ml-auto lg:max-w-none lg:justify-end lg:gap-5">
               {/* Колонка 1 — чуть вверх */}
               <div className="flex w-[32%] max-w-[9rem] shrink-0 -translate-y-2 flex-col gap-2 sm:max-w-[10.5rem] sm:-translate-y-3 sm:gap-3 lg:w-44 lg:max-w-none lg:-translate-y-4 lg:gap-4 xl:w-52">
                 <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-white/5 shadow-xl">
-                  <img alt="" src={HERO_IMAGES.b} className="absolute inset-0 size-full object-cover" />
+                  <img alt="" src={aboutHero.imageB} className="absolute inset-0 size-full object-cover" />
                   <div className={IMG_OVERLAY} />
                 </div>
                 <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-white/5 shadow-xl">
-                  <img alt="" src={HERO_IMAGES.c} className="absolute inset-0 size-full object-cover" />
+                  <img alt="" src={aboutHero.imageC} className="absolute inset-0 size-full object-cover" />
                   <div className={IMG_OVERLAY} />
                 </div>
               </div>
               {/* Колонка 2 — смещена вниз */}
               <div className="flex w-[32%] max-w-[9rem] shrink-0 translate-y-6 flex-col gap-2 sm:max-w-[10.5rem] sm:translate-y-10 sm:gap-3 lg:w-44 lg:max-w-none lg:translate-y-14 lg:gap-4 xl:w-52">
                 <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-white/5 shadow-xl">
-                  <img alt="" src={HERO_IMAGES.d} className="absolute inset-0 size-full object-cover" />
+                  <img alt="" src={aboutHero.imageD} className="absolute inset-0 size-full object-cover" />
                   <div className={IMG_OVERLAY} />
                 </div>
                 <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-white/5 shadow-xl">
-                  <img alt="" src={HERO_IMAGES.e} className="absolute inset-0 size-full object-cover" />
+                  <img alt="" src={aboutHero.imageE} className="absolute inset-0 size-full object-cover" />
                   <div className={IMG_OVERLAY} />
                 </div>
               </div>
               {/* Колонка 3 — одно высокое фото, последняя, чуть вверх */}
               <div className="w-[32%] max-w-[9rem] shrink-0 -translate-y-1 sm:max-w-[10.5rem] sm:-translate-y-2 lg:w-44 lg:max-w-none lg:-translate-y-3 xl:w-52">
                 <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-white/5 shadow-xl">
-                  <img alt="" src={HERO_IMAGES.a} className="absolute inset-0 size-full object-cover" />
+                  <img alt="" src={aboutHero.imageA} className="absolute inset-0 size-full object-cover" />
                   <div className={IMG_OVERLAY} />
                 </div>
               </div>
@@ -207,41 +172,28 @@ export function AboutPage() {
       {/* Горизонтальная линия между hero и блоком «Наша миссия» (на всю ширину) */}
       <div className="border-t border-white/10" aria-hidden />
 
-      {/* Наша миссия: текст + лого + полноширинное фото */}
+      {/* Наша миссия: на мобиле сначала лого, затем заголовок и текст; на lg — текст слева, лого справа */}
       <section aria-labelledby="about-mission-heading">
         <div className="mx-auto max-w-7xl px-6 pt-10 sm:pt-12 lg:px-8 lg:pt-14">
-          <div className="mx-auto max-w-2xl lg:mx-0">
-            <h2
-              id="about-mission-heading"
-              className="text-pretty text-4xl font-semibold tracking-tight text-white sm:text-5xl"
-            >
-              Наша миссия
-            </h2>
-          </div>
-          <div className="mx-auto mt-8 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-16 sm:mt-10 lg:mx-0 lg:max-w-none lg:grid-cols-12 lg:mt-12">
-            <div className="lg:col-span-7">
-              <p className="text-base/7 text-gray-300">
-                Наша миссия проста:{' '}
-                <span className="text-white">
-                  давать вам качественный, экологически чистый товар по доступной цене
-                </span>
-                . Мы считаем, что натуральные ткани, аккуратный пошив и честный состав не должны быть
-                роскошью — их можно носить каждый день без переплаты за лишний шум вокруг бренда.
-              </p>
-              <p className="mt-6 text-base/7 text-gray-400">
-                Отбираем поставщиков и модели с упором на лён, хлопок и безопасные для кожи материалы,
-                проверяем соотношение цены и качества и держим ассортимент понятным: вы видите, за что платите,
-                и получаете вещь, которой не стыдно пользоваться долго.
-              </p>
-            </div>
-            <div className="flex justify-center border-t border-white/10 pt-10 sm:pt-16 lg:col-span-5 lg:flex lg:items-center lg:justify-start lg:self-stretch lg:border-t-0 lg:border-l lg:border-white/10 lg:pl-10 lg:pt-0">
+          <div className="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-10 sm:gap-y-12 lg:mx-0 lg:mt-2 lg:max-w-none lg:grid-cols-12 lg:gap-y-0">
+            <div className="order-1 flex w-full min-w-0 flex-col items-center justify-center pb-2 lg:order-2 lg:col-span-5 lg:self-stretch lg:border-l lg:border-white/10 lg:px-10 lg:pb-0">
               <Link
                 to="/"
                 className="inline-flex shrink-0 text-violet-400 transition-opacity hover:opacity-90"
                 aria-label="Bulai Shop — на главную"
               >
-                <BulaiLogo className="h-14 w-auto max-w-[min(100%,340px)] sm:h-16 lg:h-[4.75rem] xl:h-20 xl:max-w-[min(100%,420px)]" />
+                <BulaiLogo className="mx-auto block h-14 w-auto max-w-[min(100%,340px)] sm:h-16 lg:h-[4.75rem] xl:h-20 xl:max-w-[min(100%,420px)]" />
               </Link>
+            </div>
+            <div className="order-2 text-center lg:order-1 lg:col-span-7 lg:text-left">
+              <h2
+                id="about-mission-heading"
+                className="text-pretty text-4xl font-semibold tracking-tight text-white sm:text-5xl"
+              >
+                {aboutMission.heading}
+              </h2>
+              <p className="mt-6 text-base/7 text-gray-300 lg:mt-8">{aboutMission.paragraph1}</p>
+              <p className="mt-6 text-base/7 text-gray-400">{aboutMission.paragraph2}</p>
             </div>
           </div>
         </div>
@@ -249,7 +201,7 @@ export function AboutPage() {
         <figure className="relative mt-16 w-full overflow-hidden sm:mt-20 lg:mt-24">
           <img
             alt=""
-            src={BANNER_IMG}
+            src={aboutMission.bannerImage}
             className="aspect-[16/6] w-full object-cover object-center md:aspect-[21/9]"
           />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-gray-900/40 to-transparent" />
@@ -258,24 +210,27 @@ export function AboutPage() {
 
       {/* Values */}
       <div className="mx-auto mt-16 max-w-7xl px-6 sm:mt-24 lg:mt-32 lg:px-8">
-        <div className="mx-auto max-w-2xl lg:mx-0">
+        <div className="mx-auto max-w-2xl text-center lg:mx-0 lg:text-left">
           <h2 className="text-pretty text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-            Наши ценности
+            {aboutValues.heading}
           </h2>
-          <p className="mt-6 text-lg/8 text-gray-400">
-            Принципы, на которых держится команда и сервис — от склада до поддержки.
-          </p>
+          <p className="mt-6 text-lg/8 text-gray-400">{aboutValues.subtitle}</p>
         </div>
         <dl className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-14 text-base/7 sm:grid-cols-2 sm:gap-y-16 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-          {VALUES.map(({ title, text, Icon }) => (
-            <div key={title}>
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-400/25">
-                <Icon className="size-6 text-indigo-400" aria-hidden />
+          {aboutValues.items.map(({ title, text, iconId }) => {
+            const Icon = VALUE_ICONS[iconId] ?? SparklesIcon
+            return (
+              <div key={title} className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-400/25">
+                  <Icon className="size-6 text-indigo-400" aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <dt className="font-semibold text-white">{title}</dt>
+                  <dd className="mt-2 text-gray-400">{text}</dd>
+                </div>
               </div>
-              <dt className="mt-4 font-semibold text-white">{title}</dt>
-              <dd className="mt-2 text-gray-400">{text}</dd>
-            </div>
-          ))}
+            )
+          })}
         </dl>
       </div>
 
@@ -313,25 +268,29 @@ export function AboutPage() {
         </div>
 
         <div className="relative overflow-hidden px-6 py-20 sm:px-10 sm:py-24 lg:px-16 lg:py-28">
-          <h2 className="mx-auto max-w-4xl text-pretty text-center text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-            Пишите на почту или звоните — мы на связи и с радостью поможем!
-          </h2>
+          <div className="mx-auto w-full max-w-4xl text-center">
+            <h2 className="text-pretty text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+              Напишите или позвоните — мы на связи
+            </h2>
+          </div>
           <div className="mx-auto mt-12 flex w-full max-w-4xl flex-col items-center gap-8 sm:mt-14 sm:gap-10">
             <div className="flex w-full flex-col items-center gap-10 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-14 sm:gap-y-8 lg:gap-x-20">
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
                 aria-label={`Написать на ${CONTACT_EMAIL}`}
-                className="group flex min-w-0 max-w-full items-center gap-4 text-xl font-semibold text-white transition-colors hover:text-indigo-300 sm:max-w-[min(100%,28rem)] sm:text-2xl lg:text-3xl"
+                className="group flex w-full min-w-0 max-w-full items-center justify-center gap-4 text-xl font-semibold text-white transition-colors hover:text-indigo-300 sm:w-auto sm:max-w-[min(100%,28rem)] sm:justify-start sm:text-2xl lg:text-3xl"
               >
                 <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-400/25 transition group-hover:ring-indigo-400/40">
                   <EnvelopeIcon className="size-8 text-indigo-400" aria-hidden />
                 </span>
-                <span className="min-w-0 break-all sm:break-normal">{CONTACT_EMAIL}</span>
+                <span className="min-w-0 break-all text-center sm:break-normal sm:text-left">
+                  {CONTACT_EMAIL}
+                </span>
               </a>
               <a
                 href={`tel:${CONTACT_PHONE_TEL}`}
                 aria-label={`Позвонить: ${CONTACT_PHONE_DISPLAY}`}
-                className="group flex shrink-0 items-center gap-4 text-xl font-semibold text-white transition-colors hover:text-indigo-300 sm:text-2xl lg:text-3xl"
+                className="group flex w-full shrink-0 items-center justify-center gap-4 text-xl font-semibold text-white transition-colors hover:text-indigo-300 sm:w-auto sm:justify-start sm:text-2xl lg:text-3xl"
               >
                 <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-400/25 transition group-hover:ring-indigo-400/40">
                   <PhoneIcon className="size-8 text-indigo-400" aria-hidden />
@@ -340,7 +299,7 @@ export function AboutPage() {
               </a>
             </div>
             <ul
-              className="flex w-full flex-wrap justify-center gap-3"
+              className="flex w-full flex-wrap items-center justify-center gap-3"
               aria-label="Мессенджеры и соцсети"
             >
               {CONTACT_SOCIAL.map(({ name, href, Icon }) => (

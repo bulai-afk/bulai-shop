@@ -1,0 +1,118 @@
+# Деплой на Hoster.by при пуше в main (как https://github.com/bulai-afk/bulai.by).
+# Секреты: Settings → Secrets and variables → Actions.
+
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DEPLOY_REMOTE_DIR: bulai-shop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install and build frontend
+        env:
+          VITE_YANDEX_CLIENT_ID: ${{ secrets.VITE_YANDEX_CLIENT_ID }}
+          VITE_YANDEX_REDIRECT_URI: ${{ secrets.VITE_YANDEX_REDIRECT_URI }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install and build API
+        working-directory: server
+        run: |
+          npm ci
+          npm run build
+          npm ci --omit=dev
+
+      - name: Create archives
+        run: |
+          COPYFILE_DISABLE=1 tar -czf dist.tar.gz dist
+          COPYFILE_DISABLE=1 tar -czf server.tar.gz -C server dist node_modules package.json package-lock.json
+          tar -tzf dist.tar.gz > /dev/null
+          tar -tzf server.tar.gz > /dev/null
+
+      - name: Check deploy secrets
+        run: |
+          if [ -z "${{ secrets.DEPLOY_HOST }}" ] || [ -z "${{ secrets.DEPLOY_USER }}" ] || [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ]; then
+            echo "::error::Set DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY in repo Secrets"
+            exit 1
+          fi
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" | sed 's/\\n/\n/g' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Upload and deploy
+        timeout-minutes: 15
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR || 'bulai-shop' }}
+        run: |
+          set -e
+          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=300 -o ServerAliveInterval=60"
+          REMOTE_HOME=$(ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} 'echo $HOME' | tr -d '\r\n')
+          REMOTE="${REMOTE_HOME}/${REMOTE_DIR}"
+          ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p ${REMOTE}/scripts ${REMOTE}/tmp"
+          echo "DIST_SIZE=$(stat -c %s dist.tar.gz)" >> $GITHUB_ENV
+          echo "SERVER_SIZE=$(stat -c %s server.tar.gz)" >> $GITHUB_ENV
+          rsync -avz -e "ssh $SSH_OPTS" dist.tar.gz server.tar.gz start.js \
+            ${DEPLOY_USER}@${DEPLOY_HOST}:${REMOTE}/
+          rsync -avz -e "ssh $SSH_OPTS" scripts/deploy-remote.sh scripts/restart-on-server.sh \
+            ${DEPLOY_USER}@${DEPLOY_HOST}:${REMOTE}/scripts/
+
+      - name: Verify upload
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR || 'bulai-shop' }}
+        run: |
+          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=15"
+          REMOTE_DIST=$(ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} "stat -c %s ~/${REMOTE_DIR}/dist.tar.gz 2>/dev/null || echo 0")
+          REMOTE_SERVER=$(ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} "stat -c %s ~/${REMOTE_DIR}/server.tar.gz 2>/dev/null || echo 0")
+          if [ "$REMOTE_DIST" != "$DIST_SIZE" ] || [ "$REMOTE_SERVER" != "$SERVER_SIZE" ]; then
+            echo "::error::Upload size mismatch. dist local=$DIST_SIZE remote=$REMOTE_DIST; server local=$SERVER_SIZE remote=$REMOTE_SERVER"
+            exit 1
+          fi
+
+      - name: Extract on server
+        timeout-minutes: 5
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR || 'bulai-shop' }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '3001' }}
+        run: |
+          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=60 -o BatchMode=yes"
+          REMOTE_HOME=$(ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} 'echo $HOME' | tr -d '\r\n')
+          ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${REMOTE_HOME}/${REMOTE_DIR} && DEPLOY_DIR=${REMOTE_HOME}/${REMOTE_DIR} PORT=${DEPLOY_PORT} bash -s" < scripts/deploy-remote.sh
+
+      - name: Restart app on server
+        timeout-minutes: 2
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR || 'bulai-shop' }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '3001' }}
+        run: |
+          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30"
+          ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} \
+            "DEPLOY_DIR=\$HOME/${REMOTE_DIR} PORT=${DEPLOY_PORT} bash \$HOME/${REMOTE_DIR}/scripts/restart-on-server.sh"

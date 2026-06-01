@@ -1,0 +1,8 @@
+# Прокси на Node.js (bulai-shop, start.js, PORT=3001).
+# Положить в ~/public_html/.htaccess домена магазина (или подкаталога).
+# В панели Hoster.by: приложение Node с корнем bulai-shop и startup start.js.
+
+RewriteEngine On
+RewriteBase /
+RewriteCond %{REQUEST_URI} !^/\.well-known/
+RewriteRule ^(.*)$ http://127.0.0.1:3001/$1 [P,L]

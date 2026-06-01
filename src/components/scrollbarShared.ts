@@ -27,6 +27,10 @@ export const panelScrollbarRailClass =
 export const drawerPanelScrollbarRailClass =
   'pointer-events-none absolute inset-y-0 right-2 z-10 flex w-2 flex-col items-center justify-center'
 
+/** Админ-сайдбар: 8px от левого края экрана + safe-area; текст с `pl-6` как у логотипа. */
+export const adminSidebarPanelScrollbarRailClass =
+  'pointer-events-none absolute inset-y-0 z-10 flex w-2 flex-col items-center justify-center [left:calc(8px+env(safe-area-inset-left,0px))]'
+
 /**
  * Портальный рельс модалки профиля: без `right-2`, позиция задаётся `pinnedRailStyle` по `getBoundingClientRect` панели —
  * высота = вся панель, дорожка центрируется по вертикали (`items-center justify-center` + `scrollbarTrackSlotWrapperClass`).
@@ -44,7 +48,7 @@ export const viewportPinnedScrollbarRailClass =
  * inner = 100vw − 4rem; три промежутка gap-8 = 6rem; ширина колонки = (100vw − 10rem) / 4.
  */
 export const catalogFiltersPinnedScrollbarRailClass =
-  'pointer-events-none fixed top-[calc(7rem+30px)] bottom-4 z-[59] hidden w-2 lg:flex lg:flex-col lg:items-center lg:justify-center right-[max(0.5rem,calc(100vw-2rem-(100vw-10rem)/4-0.25rem))]'
+  'pointer-events-none fixed top-[calc(7rem+30px)] bottom-4 z-[70] hidden w-2 lg:flex lg:flex-col lg:items-center lg:justify-center right-[max(0.5rem,calc(100vw-2rem-(100vw-10rem)/4-0.25rem))]'
 
 /** Кликабельная дорожка (заполняет обёртку по высоте). */
 export const scrollbarTrackClass =

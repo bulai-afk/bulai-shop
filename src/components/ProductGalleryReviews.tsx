@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { PanelScrollArea } from './PanelScrollArea'
+import { WriteReviewDialog, type WriteReviewProductPreview } from './WriteReviewDialog'
 import { useMainScrollbarSuppression } from '../context/MainScrollbarSuppressionContext'
 import { MOCK_CATALOG_REVIEWS } from '../data/mockCatalogReviews'
 import { getPageScrollElement } from '../utils/getPageScrollElement'
@@ -13,15 +14,17 @@ const PAGE_SCROLL_BOTTOM_SLACK_PX = 4
 type Props = {
   productRating: number
   reviewCount: number
+  productPreview?: WriteReviewProductPreview | null
 }
 
-export function ProductGalleryReviews({ productRating, reviewCount }: Props) {
+export function ProductGalleryReviews({ productRating, reviewCount, productPreview }: Props) {
   const headingId = useId().replace(/:/g, '')
   const [reviewStarsFilter, setReviewStarsFilter] = useState<number | null>(null)
   const reviewsSidebarRef = useRef<HTMLDivElement>(null)
   const [reviewsListViewportHeightPx, setReviewsListViewportHeightPx] = useState<number | null>(null)
   const [pageScrollAtBottom, setPageScrollAtBottom] = useState(false)
   const { setHideMainScrollbarForCatalogBottom } = useMainScrollbarSuppression()
+  const [writeReviewOpen, setWriteReviewOpen] = useState(false)
 
   const recentReviews = MOCK_CATALOG_REVIEWS
   const total = recentReviews.length
@@ -110,7 +113,7 @@ export function ProductGalleryReviews({ productRating, reviewCount }: Props) {
             <div ref={reviewsSidebarRef} className="lg:col-span-4">
               <h2
                 id={`product-reviews-${headingId}`}
-                className="text-2xl font-bold tracking-tight text-white"
+                className="text-center text-2xl font-bold tracking-tight text-white lg:text-left"
               >
                 Отзывы о товаре
               </h2>
@@ -230,12 +233,13 @@ export function ProductGalleryReviews({ productRating, reviewCount }: Props) {
                 <p className="mt-1 text-sm text-gray-300">
                   Если вы покупали у нас, оставьте отзыв — это помогает другим выбрать.
                 </p>
-                <a
-                  href="#"
-                  className="mt-6 block w-full rounded-lg bg-slate-700/65 px-4 py-2.5 text-center text-sm font-semibold text-gray-100 transition hover:bg-slate-600/75"
+                <button
+                  type="button"
+                  onClick={() => setWriteReviewOpen(true)}
+                  className="mt-6 w-full rounded-lg bg-slate-700/65 px-4 py-2.5 text-center text-sm font-semibold text-gray-100 transition hover:bg-slate-600/75"
                 >
                   Написать отзыв
-                </a>
+                </button>
               </div>
             </div>
 
@@ -290,6 +294,12 @@ export function ProductGalleryReviews({ productRating, reviewCount }: Props) {
           </div>
         </div>
       </div>
+
+      <WriteReviewDialog
+        open={writeReviewOpen}
+        onClose={() => setWriteReviewOpen(false)}
+        productPreview={productPreview}
+      />
     </section>
   )
 }

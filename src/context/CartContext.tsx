@@ -2,11 +2,16 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
-import { products, type Product } from '../data/catalogProducts'
+import { fetchPromoCodesCatalogFromApi } from '../api/promoCodesCatalogApi'
+import { type Product } from '../data/catalogProducts'
+import { useCatalogInventory } from './CatalogInventoryContext'
+import { promoCatalogRowsToPercentMap } from '../utils/promoCodePercentMap'
 
 export type CartLine = {
   lineId: string
@@ -36,12 +41,13 @@ export function formatCartAmount(n: number): string {
   return new Intl.NumberFormat('ru-RU').format(Math.round(n)).replace(/\u00A0/g, ' ')
 }
 
-/** Известные промокоды: верхний регистр → процент скидки от промежуточного итога. */
+/** Если API промокодов недоступен или в БД ещё нет снимка — эти коды всё ещё работают. */
 export const CART_PROMO_CODES: Record<string, number> = {
   HELLO15: 15,
 }
 
-function buildInitialLines(): CartLine[] {
+function buildInitialLines(products: Product[]): CartLine[] {
+  if (products.length === 0) return []
   return products.slice(0, 3).map((p) => {
     const c = p.colors[0]
     return {
@@ -94,15 +100,80 @@ type CartContextValue = {
 const CartContext = createContext<CartContextValue | null>(null)
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [lines, setLines] = useState<CartLine[]>(buildInitialLines)
+  const { products, catalogFingerprint } = useCatalogInventory()
+  const [lines, setLines] = useState<CartLine[]>([])
+  const lastCatalogFingerprintRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const fp = catalogFingerprint
+    if (lastCatalogFingerprintRef.current === fp) return
+
+    if (lastCatalogFingerprintRef.current === null) {
+      setLines(buildInitialLines(products))
+      lastCatalogFingerprintRef.current = fp
+      return
+    }
+
+    lastCatalogFingerprintRef.current = fp
+    const byId = Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, Product>
+    setLines((prev) => {
+      const next: CartLine[] = []
+      for (const line of prev) {
+        const p = byId[line.productId]
+        if (!p) continue
+        const swatch = p.colors.find((c) => c.name === line.colorLabel) ?? p.colors[0]
+        next.push({
+          ...line,
+          name: p.name,
+          href: `/product/${p.id}`,
+          priceDisplay: p.price,
+          oldPriceDisplay: p.oldPrice,
+          discountLabel: p.discount,
+          imageSrc: swatch?.image ?? p.image,
+          imageAlt: `${p.name}, цвет ${swatch?.name ?? line.colorLabel}`,
+          colorSwatchClassName: swatch?.className,
+        })
+      }
+      if (next.length === 0 && prev.length > 0) {
+        return buildInitialLines(products)
+      }
+      return next
+    })
+  }, [catalogFingerprint, products])
   const [isOpen, setOpen] = useState(false)
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null)
+  const [promoPercentByCode, setPromoPercentByCode] = useState<Record<string, number>>(() => ({
+    ...CART_PROMO_CODES,
+  }))
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const remote = await fetchPromoCodesCatalogFromApi()
+        if (cancelled || remote == null) return
+        setPromoPercentByCode(promoCatalogRowsToPercentMap(remote.promoCodes))
+      } catch {
+        /* остаётся CART_PROMO_CODES */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!appliedPromoCode) return
+    if (promoPercentByCode[appliedPromoCode] === undefined) {
+      setAppliedPromoCode(null)
+    }
+  }, [promoPercentByCode, appliedPromoCode])
 
   const totalCount = useMemo(() => lines.reduce((s, l) => s + l.quantity, 0), [lines])
 
   const appliedPromoPercent =
-    appliedPromoCode && CART_PROMO_CODES[appliedPromoCode] !== undefined
-      ? CART_PROMO_CODES[appliedPromoCode]
+    appliedPromoCode && promoPercentByCode[appliedPromoCode] !== undefined
+      ? promoPercentByCode[appliedPromoCode]
       : 0
 
   const {
@@ -142,12 +213,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setAppliedPromoCode(null)
       return 'empty' as const
     }
-    if (CART_PROMO_CODES[code] !== undefined) {
+    if (promoPercentByCode[code] !== undefined) {
       setAppliedPromoCode(code)
       return 'ok' as const
     }
     return 'invalid' as const
-  }, [])
+  }, [promoPercentByCode])
 
   const clearPromo = useCallback(() => setAppliedPromoCode(null), [])
 

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import {
   Tab,
@@ -8,23 +8,17 @@ import {
   TabPanels,
 } from '@headlessui/react'
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline'
-import { CatalogPriceLabel } from '../components/CatalogPriceLabel'
+import { CatalogProductCard } from '../components/CatalogProductCard'
 import { ProductGalleryReviews } from '../components/ProductGalleryReviews'
+import { useCatalogInventory } from '../context/CatalogInventoryContext'
 import { useCart } from '../context/CartContext'
+import { usePublicDocuments } from '../context/PublicDocumentsContext'
 import {
-  getProductById,
-  getRelatedProducts,
-  META_BY_ID,
+  FIT_LABELS,
+  resolveProductAccordionCare,
+  resolveProductAccordionFeatures,
   type Product,
-  type ProductMeta,
 } from '../data/catalogProducts'
-
-const FIT_LABELS: Record<ProductMeta['fit'], string> = {
-  slim: 'Приталенная',
-  regular: 'Стандартная',
-  relaxed: 'Свободная',
-  wide: 'Широкая',
-}
 
 function classNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ')
@@ -68,89 +62,6 @@ function ProductRatingStars({ rating }: { rating: number }) {
   )
 }
 
-function RelatedCard({ p }: { p: Product }) {
-  const [activeColorName, setActiveColorName] = useState(p.colors[0]?.name ?? '')
-
-  useEffect(() => {
-    setActiveColorName(p.colors[0]?.name ?? '')
-  }, [p.id])
-
-  const activeSwatch = p.colors.find((c) => c.name === activeColorName)
-  const displayImage = activeSwatch?.image ?? p.image
-  const meta = META_BY_ID[p.id]
-
-  return (
-    <article className="rounded-2xl">
-      <div className="relative">
-        <div className="overflow-hidden rounded-2xl">
-          <img
-            src={displayImage}
-            alt={`${p.name}, цвет ${activeSwatch?.name ?? ''}`}
-            className="aspect-[4/5] w-full object-cover transition duration-300 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-90" />
-          <p
-            className={`absolute top-3 right-3 rounded-md px-2.5 py-1 text-xs font-semibold ${
-              meta?.inStock ? 'bg-emerald-500/85 text-white' : 'bg-rose-500/85 text-white'
-            }`}
-          >
-            {meta?.inStock ? 'В наличии' : 'Нет в наличии'}
-          </p>
-          <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-            {p.sizes.map((size) => (
-              <span
-                key={size}
-                className="inline-flex min-w-8 items-center justify-center rounded-md bg-black/70 px-2 py-1 text-center text-[11px] font-semibold tracking-wide text-white"
-              >
-                {size}
-              </span>
-            ))}
-          </div>
-          <div className="absolute bottom-3 right-3 max-w-[calc(100%-1.5rem)]">
-            <CatalogPriceLabel price={p.price} oldPrice={p.oldPrice} discount={p.discount} />
-          </div>
-        </div>
-        {p.colors.length > 0 ? (
-          <div className="absolute bottom-0 left-1/2 z-30 flex -translate-x-1/2 translate-y-1/2 items-center gap-2">
-            {p.colors.map((color) => (
-              <button
-                key={color.name}
-                type="button"
-                aria-label={color.name}
-                aria-pressed={activeColorName === color.name}
-                onClick={() => setActiveColorName(color.name)}
-                className={`h-5 w-5 rounded-full border border-white/90 ${color.className} transition ${
-                  activeColorName === color.name
-                    ? 'shadow-[0_0_0_2px_rgba(129,140,248,0.95),0_0_14px_rgba(129,140,248,0.75)]'
-                    : 'shadow-none'
-                }`}
-              />
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-6">
-        <h3 className="text-center text-base font-semibold text-gray-100">{p.name}</h3>
-
-        <div className="mt-2">
-          <div className="flex items-center justify-center">
-            <ProductRatingStars rating={p.rating} />
-          </div>
-          <p className="mt-1 text-center text-sm text-gray-500">Оценок: {p.reviews}</p>
-        </div>
-
-        <Link
-          to={`/product/${p.id}`}
-          className="mt-4 flex w-full items-center justify-center rounded-lg bg-slate-700/65 px-4 py-2.5 text-sm font-semibold text-gray-100 transition hover:bg-slate-600/75"
-        >
-          Перейти к товару
-        </Link>
-      </div>
-    </article>
-  )
-}
-
 type GalleryItem = { label: string; image: string; alt: string }
 
 function buildGallery(product: Product): GalleryItem[] {
@@ -166,22 +77,103 @@ function buildGallery(product: Product): GalleryItem[] {
 
 export function ProductPage() {
   const { productId } = useParams<{ productId: string }>()
+  const { metaById, getProductById, getRelatedProducts } = useCatalogInventory()
   const product = productId ? getProductById(productId) : undefined
-  const meta = productId ? META_BY_ID[productId] : undefined
+  const meta = productId ? metaById[productId] : undefined
   const { addItem } = useCart()
+  const { productPageDocumentLinks, openDocumentInViewer } = usePublicDocuments()
 
   const [selectedColorName, setSelectedColorName] = useState('')
   const [selectedSize, setSelectedSize] = useState('')
   const detailsAccordionUid = useId().replace(/:/g, '')
   const [detailsOpenIdx, setDetailsOpenIdx] = useState<number | null>(0)
+  const [relatedColorByProduct, setRelatedColorByProduct] = useState<Record<string, string>>({})
 
   const gallery = useMemo(() => (product ? buildGallery(product) : []), [product])
+
+  const accordionFeatures = useMemo(() => {
+    if (!product || !meta) {
+      return {
+        category: '',
+        fit: '',
+        material: '',
+        season: '',
+        any: [] as string[],
+      }
+    }
+    return resolveProductAccordionFeatures(meta, product.accordionSections?.features)
+  }, [product, meta])
+
+  const accordionCare = useMemo(
+    () => (product ? resolveProductAccordionCare(product.accordionSections?.care) : []),
+    [product],
+  )
+
+  const productDetailSections = useMemo((): { title: string; body: ReactNode }[] => {
+    const sections: { title: string; body: ReactNode }[] = [
+      {
+        title: 'Особенности',
+        body: (
+          <ul role="list" className="list-disc space-y-2 pl-5 text-sm text-gray-300">
+            <li>Категория: {accordionFeatures.category}</li>
+            <li>Посадка: {accordionFeatures.fit}</li>
+            <li>Материал: {accordionFeatures.material}</li>
+            <li>Сезон: {accordionFeatures.season}</li>
+            {accordionFeatures.any.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        ),
+      },
+      {
+        title: 'Уход',
+        body: (
+          <ul role="list" className="list-disc space-y-2 pl-5 text-sm text-gray-300">
+            {accordionCare.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        ),
+      },
+    ]
+    if (productPageDocumentLinks.length > 0) {
+      sections.push({
+        title: 'Документы',
+        body: (
+          <ul role="list" className="list-none space-y-2 pl-0 text-sm text-gray-300">
+            {productPageDocumentLinks.map((l) => (
+              <li key={l.id}>
+                <button
+                  type="button"
+                  className="text-left text-indigo-300/90 underline decoration-indigo-500/35 underline-offset-2 transition hover:text-indigo-200"
+                  onClick={() => openDocumentInViewer(l)}
+                >
+                  {l.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ),
+      })
+    }
+    return sections
+  }, [accordionFeatures, accordionCare, productPageDocumentLinks, openDocumentInViewer])
 
   useEffect(() => {
     if (!product) return
     setSelectedColorName(product.colors[0]?.name ?? '')
     setSelectedSize(product.sizes[0] ?? '')
   }, [product])
+
+  useEffect(() => {
+    if (!productId) return
+    const prod = getProductById(productId)
+    if (!prod) return
+    const rel = getRelatedProducts(prod.id, 4)
+    setRelatedColorByProduct(
+      Object.fromEntries(rel.map((p) => [p.id, p.colors[0]?.name ?? ''])),
+    )
+  }, [productId, getProductById, getRelatedProducts])
 
   const colorIndex = useMemo(() => {
     if (!product?.colors.length) return 0
@@ -194,6 +186,10 @@ export function ProductPage() {
   }
 
   const related = getRelatedProducts(product.id, 4)
+
+  const activeSwatchForReview =
+    product.colors.find((c) => c.name === selectedColorName) ?? product.colors[0]
+  const reviewPreviewImage = activeSwatchForReview?.image ?? product.image
 
   return (
     <div>
@@ -280,11 +276,13 @@ export function ProductPage() {
 
           {/* Product info */}
           <div className="mt-10 px-4 sm:mt-16 sm:px-0 lg:mt-0">
-            <h1 className="text-3xl font-bold tracking-tight text-white">{product.name}</h1>
+            <h1 className="text-center text-3xl font-bold tracking-tight text-white sm:text-left">
+              {product.name}
+            </h1>
 
             <div className="mt-8 sm:mt-10">
               <h2 className="sr-only">Информация о товаре</h2>
-              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-x-10">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-6 lg:gap-x-10">
                 <div>
                   <h3 className="text-sm font-medium text-white">Цена</h3>
                   <div className="mt-4">
@@ -337,7 +335,7 @@ export function ProductPage() {
                 addItem(product, color, size)
               }}
             >
-              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-x-10">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-6 lg:gap-x-10">
                 {product.colors.length > 0 ? (
                   <div>
                     <h3 className="text-sm font-medium text-white">Цвет</h3>
@@ -362,7 +360,7 @@ export function ProductPage() {
                               <span
                                 aria-hidden
                                 className={classNames(
-                                  'h-8 w-8 rounded-full border border-black/10 shadow-inner',
+                                  'h-8 w-8 rounded-full border border-black/10 shadow-[0_4px_14px_rgba(0,0,0,0.55),0_0_0_1px_rgba(255,255,255,0.06)]',
                                   color.className,
                                   checked ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-gray-900' : '',
                                 )}
@@ -379,13 +377,18 @@ export function ProductPage() {
                   <div>
                     <h3 className="text-sm font-medium text-white">Размер</h3>
                     <fieldset aria-label="Выберите размер" className="mt-4">
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap items-center gap-2 overflow-visible py-0.5">
                         {product.sizes.map((size) => {
                           const checked = selectedSize === size
                           return (
                             <label
                               key={size}
-                              className="group relative flex min-w-12 cursor-pointer items-center justify-center rounded-md border bg-gray-800/50 px-4 py-2 text-sm font-medium uppercase text-gray-200 transition focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-900"
+                              className={classNames(
+                                'group relative flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border bg-gray-800/50 text-xs font-semibold uppercase leading-none tracking-wide text-gray-200 transition focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-900',
+                                checked
+                                  ? 'z-[1] border-indigo-400/60 shadow-[0_0_0_2px_rgba(129,140,248,0.95),0_0_14px_rgba(129,140,248,0.72)]'
+                                  : 'border-white/10 shadow-none',
+                              )}
                             >
                               <input
                                 type="radio"
@@ -407,7 +410,9 @@ export function ProductPage() {
                               <span
                                 className={classNames(
                                   'pointer-events-none absolute inset-0 rounded-md border-2',
-                                  checked ? 'border-indigo-500' : 'border-transparent group-hover:border-white/20',
+                                  checked
+                                    ? 'border-transparent'
+                                    : 'border-transparent group-hover:border-white/25',
                                 )}
                                 aria-hidden
                               />
@@ -435,64 +440,15 @@ export function ProductPage() {
               aria-labelledby="product-extra-heading"
               className="mt-12 border-t border-white/10 pt-10"
             >
-              <h2 id="product-extra-heading" className="text-lg font-semibold tracking-tight text-white sm:text-xl">
+              <h2
+                id="product-extra-heading"
+                className="text-center text-lg font-semibold tracking-tight text-white sm:text-left sm:text-xl"
+              >
                 Дополнительная информация
               </h2>
 
               <dl className="mt-8 divide-y divide-white/10 border-t border-b border-white/10">
-                {(
-                  [
-                    {
-                      title: 'Особенности',
-                      body: (
-                        <ul role="list" className="list-disc space-y-2 pl-5 text-sm text-gray-300">
-                          <li>Категория: {meta.category}</li>
-                          <li>Посадка: {FIT_LABELS[meta.fit]}</li>
-                          <li>Материал: {meta.material}</li>
-                          <li>Сезон: {meta.season}</li>
-                          <li>Плотная строчка по швам, усиленные точки натяжения</li>
-                          <li>Фурнитура без никеля (по большинству моделей)</li>
-                          <li>Цвет на экране может слегка отличаться от реального — это норма для фото</li>
-                        </ul>
-                      ),
-                    },
-                    {
-                      title: 'Уход',
-                      body: (
-                        <ul role="list" className="list-disc space-y-2 pl-5 text-sm text-gray-300">
-                          <li>Следуйте символам на вшивной этикетке — у разных цветов режим может отличаться</li>
-                          <li>Стирка при 30 °C, деликатный отжим; не использовать отбеливатель</li>
-                          <li>Гладить с изнанки при необходимости, средняя температура</li>
-                          <li>Не сушить на батарее и в прямых солнечных лучах — чтобы не выцвело</li>
-                          <li>Для денима и плотного хлопка: первая стирка отдельно, возможен лёгкий линяк</li>
-                        </ul>
-                      ),
-                    },
-                    {
-                      title: 'Доставка',
-                      body: (
-                        <ul role="list" className="list-disc space-y-2 pl-5 text-sm text-gray-300">
-                          <li>Бесплатная доставка при заказе от пороговой суммы — актуальные условия в корзине</li>
-                          <li>Самовывоз из шоурума и ПВЗ партнёрских служб</li>
-                          <li>Экспресс-доставка в крупных городах при наличии курьера</li>
-                          <li>Международные отправки — по запросу, сроки и стоимость считаем отдельно</li>
-                          <li>Упаковка без лишнего пластика, где это возможно</li>
-                        </ul>
-                      ),
-                    },
-                    {
-                      title: 'Возврат',
-                      body: (
-                        <ul role="list" className="list-disc space-y-2 pl-5 text-sm text-gray-300">
-                          <li>Оформите возврат в личном кабинете или напишите в поддержку — пришлём инструкцию</li>
-                          <li>Сохраняйте чек и бирки; без следов носки и запаха</li>
-                          <li>Возврат денег на карту обычно 3–10 рабочих дней после приёмки на складе</li>
-                          <li>Частичный возврат по заказу — возможен, если несколько позиций</li>
-                        </ul>
-                      ),
-                    },
-                  ] as const
-                ).map((item, idx) => {
+                {productDetailSections.map((item, idx) => {
                   const isOpen = detailsOpenIdx === idx
                   const panelId = `product-details-${detailsAccordionUid}-${idx}`
                   return (
@@ -531,6 +487,9 @@ export function ProductPage() {
                   )
                 })}
               </dl>
+              <p className="mt-6 max-w-prose text-sm text-gray-500">
+                Актуальные условия доставки и возврата — на шаге оформления заказа и в разделе ваших заказов.
+              </p>
             </section>
           </div>
         </div>
@@ -547,17 +506,35 @@ export function ProductPage() {
           >
             Рекомендуем с этим товаром
           </h2>
-          <ul className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          <ul className="mt-8 grid grid-cols-2 gap-5 lg:grid-cols-4">
             {related.map((p) => (
               <li key={p.id} className="group min-w-0">
-                <RelatedCard p={p} />
+                <CatalogProductCard
+                  product={p}
+                  meta={metaById[p.id]}
+                  activeColorName={relatedColorByProduct[p.id] ?? p.colors[0]?.name ?? ''}
+                  onPickColor={(colorName) =>
+                    setRelatedColorByProduct((prev) => ({ ...prev, [p.id]: colorName }))
+                  }
+                  productTitleLevel="h3"
+                />
               </li>
             ))}
           </ul>
         </section>
       ) : null}
 
-      <ProductGalleryReviews productRating={product.rating} reviewCount={product.reviews} />
+      <ProductGalleryReviews
+        productRating={product.rating}
+        reviewCount={product.reviews}
+        productPreview={{
+          name: product.name,
+          image: reviewPreviewImage,
+          size: selectedSize || product.sizes[0] || '—',
+          color: selectedColorName || product.colors[0]?.name || '—',
+          colorSwatchClassName: activeSwatchForReview?.className,
+        }}
+      />
     </div>
   )
 }

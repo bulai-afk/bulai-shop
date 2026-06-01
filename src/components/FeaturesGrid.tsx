@@ -1,95 +1,102 @@
 import { forwardRef, type ComponentType, type SVGProps } from 'react'
 import {
   ArrowPathIcon,
+  BoltIcon,
+  ChatBubbleLeftRightIcon,
+  ClockIcon,
+  GiftIcon,
+  HeartIcon,
   LockClosedIcon,
+  MapPinIcon,
   ShieldCheckIcon,
+  SparklesIcon,
+  StarIcon,
   TruckIcon,
 } from '@heroicons/react/24/outline'
+import type { HomeFeaturesForm, PromoFeatureIconId } from '../admin/types/siteSettings'
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>
 
-const features: {
-  name: string
-  description: string
-  icon: IconComponent
-}[] = [
-  {
-    name: 'Доставка без суеты',
-    description:
-      'Отправляем по России удобными службами. Сроки и стоимость подскажем при оформлении — без лишних звонков. Помощь с размером — в контактах или при заказе.',
-    icon: TruckIcon,
-  },
-  {
-    name: 'Качество материалов',
-    description:
-      'Подбираем ткани и фурнитуру у проверенных поставщиков: износостойкость, аккуратные швы и комфорт на коже — чтобы вещь служила долго и выглядела достойно.',
-    icon: ShieldCheckIcon,
-  },
-  {
-    name: 'Обмен и возврат',
-    description:
-      'Если вещь не подошла, обсудим замену или возврат по правилам магазина — без давления и лишней бюрократии.',
-    icon: ArrowPathIcon,
-  },
-  {
-    name: 'Безопасная оплата',
-    description:
-      'Готовим оплату онлайн картой и другими способами. Данные защищены — о сроках запуска сообщим отдельно.',
-    icon: LockClosedIcon,
-  },
-]
-
-type FeaturesGridProps = {
-  /** 0–1: на главной привязка к прокрутке hero; по умолчанию 1 (без анимации). */
-  revealProgress?: number
+const FEATURE_ICONS: Record<PromoFeatureIconId, IconComponent> = {
+  truck: TruckIcon,
+  shield: ShieldCheckIcon,
+  refresh: ArrowPathIcon,
+  lock: LockClosedIcon,
+  sparkles: SparklesIcon,
+  gift: GiftIcon,
+  clock: ClockIcon,
+  chat: ChatBubbleLeftRightIcon,
+  mapPin: MapPinIcon,
+  star: StarIcon,
+  heart: HeartIcon,
+  bolt: BoltIcon,
 }
 
-/** Секция «почему мы»: заголовок по центру и сетка 2×2 (Tailwind Plus–стиль). */
+const SECTION_TONE_CLASS: Record<'primary' | 'secondary', string> = {
+  primary: 'bg-gray-900',
+  secondary: 'border-t border-white/5 bg-gray-950',
+}
+
+type FeaturesGridProps = {
+  block: HomeFeaturesForm
+  /** id элемента h2 — для aria-labelledby и якорей */
+  headingId: string
+  /** 0–1: на главной привязка к прокрутке hero; по умолчанию 1 (без анимации). */
+  revealProgress?: number
+  /** Визуальное отличие второй секции на главной */
+  tone?: 'primary' | 'secondary'
+}
+
+/** Секция с заголовком по центру и сеткой карточек (иконка + название + текст). */
 export const FeaturesGrid = forwardRef<HTMLElement, FeaturesGridProps>(function FeaturesGrid(
-  { revealProgress = 1 },
+  { block, headingId, revealProgress = 1, tone = 'primary' },
   ref,
 ) {
   const p = Math.min(1, Math.max(0, revealProgress))
   const lift = (1 - p) * 2.25
   const opacity = 0.35 + 0.65 * p
+  const toneClass = SECTION_TONE_CLASS[tone]
 
   return (
     <section
       ref={ref}
-      className="scroll-mt-[6.5rem] bg-gray-900 py-14 sm:py-16 lg:py-20"
+      className={`scroll-mt-[6.5rem] py-14 sm:py-16 lg:py-20 ${toneClass}`}
       style={{
         transform: `translate3d(0, ${lift}rem, 0)`,
         opacity,
         willChange: p < 1 ? 'transform, opacity' : 'auto',
       }}
-      aria-labelledby="features-heading"
+      aria-labelledby={headingId}
     >
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-base/7 font-semibold text-indigo-400">Почему мы</p>
+          <p className="text-base/7 font-semibold text-indigo-400">{block.eyebrow}</p>
           <h2
-            id="features-heading"
-            className="mt-2 text-4xl font-semibold tracking-tight text-pretty text-white sm:text-5xl lg:text-balance"
+            id={headingId}
+            className="mt-2 text-center text-4xl font-semibold tracking-tight text-pretty text-white sm:text-5xl lg:text-balance"
           >
-            Покупать удобно — от выбора до получения
+            {block.title}
           </h2>
-          <p className="mt-4 text-lg/8 text-gray-300">
-            Актуальные модели и аккуратный сервис: держим в фокусе ваш комфорт, а не только витрину.
-          </p>
+          <p className="mt-4 text-lg/8 text-gray-300">{block.subtitle}</p>
         </div>
         <div className="mx-auto mt-10 w-full max-w-2xl sm:mt-12 lg:mt-14 lg:max-w-4xl">
-          <dl className="mx-auto grid max-w-xl grid-cols-1 gap-x-8 gap-y-10 lg:max-w-none lg:grid-cols-2 lg:gap-y-16">
-            {features.map((feature) => {
-              const Icon = feature.icon
+          <dl className="mx-auto grid max-w-xl grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-1 sm:gap-x-8 sm:gap-y-10 lg:max-w-none lg:grid-cols-2 lg:gap-y-16">
+            {block.items.map((feature) => {
+              const Icon = FEATURE_ICONS[feature.iconId] ?? TruckIcon
               return (
-                <div key={feature.name} className="relative pl-16">
-                  <dt className="text-base/7 font-semibold text-white">
-                    <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-lg bg-indigo-500">
+                <div
+                  key={feature.name}
+                  className="flex min-w-0 flex-col items-center gap-3 text-center"
+                >
+                  <dt className="flex flex-col items-center gap-3 text-sm/6 font-semibold text-white sm:text-base/7">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500">
                       <Icon aria-hidden className="size-6 text-white" />
                     </div>
                     {feature.name}
                   </dt>
-                  <dd className="mt-2 text-base/7 text-gray-400">{feature.description}</dd>
+                  <dd className="min-w-0 text-xs/5 text-pretty text-gray-400 sm:text-base/7">
+                    {feature.description}
+                  </dd>
                 </div>
               )
             })}

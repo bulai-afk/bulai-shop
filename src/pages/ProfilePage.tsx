@@ -1,18 +1,27 @@
+import { CameraIcon } from '@heroicons/react/24/outline'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { CLIENTS_UPDATED_EVENT } from '../admin/lib/adminDraftStorage'
+import { composePhoneDisplay, parsePhoneTel, PHONE_INPUT_MAX_DIGITS } from '../admin/lib/phoneCountry'
+import { fetchStorefrontClientMe, putStorefrontClientProfileMe } from '../api/storefrontClientProfileApi'
+import { ContactPhoneField } from '../components/ContactPhoneField'
+import { isSiteConfigApiExpected } from '../constants/apiBase'
 import type { AuthUser } from '../context/AuthContext'
+import { profileExtrasStorageKey } from '../constants/profileExtrasStorage'
+import { getProfileExtrasJsonRawForAccount } from '../utils/profileExtrasLocalRead'
 import { useAuth } from '../context/AuthContext'
-
-const PROFILE_EXTRAS_KEY = 'bulai-shop-profile-extras'
+import { phoneEffectiveNationalDigits } from '../lib/contactPhoneInputDisplay'
 
 /** Как получать уведомления: SMS, email или оба */
 export type NotificationReceiveMethod = 'sms' | 'email' | 'all'
 
-type ProfileExtras = {
+export type ProfileExtras = {
   firstName: string
   lastName: string
   phone: string
+  /** Как `contact.phoneTel` в настройках сайта: только цифры для маски ввода. */
+  phoneTel: string
   email: string
-  /** ДД.ММ.ГГГГ или как пришло из Яндекса */
+  /** В профиле хранится как YYYY-MM-DD (календарь); поддерживается чтение старых ДД.ММ.ГГГГ и значений из Яндекса */
   birthday: string
   country: string
   streetAddress: string
@@ -26,10 +35,36 @@ type ProfileExtras = {
   notifyPromotions: boolean
 }
 
+/** Значение для `<input type="date" />` из сохранённой строки (ISO, ДД.ММ.ГГГГ). */
+function birthdayStorageToDateInputValue(stored: string): string {
+  const t = stored.trim()
+  if (!t) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t
+  const m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)
+  if (m) {
+    const dd = m[1].padStart(2, '0')
+    const mm = m[2].padStart(2, '0')
+    const yyyy = m[3]
+    const d = Number(dd)
+    const mo = Number(mm)
+    const y = Number(yyyy)
+    if (y < 1900 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31) return ''
+    const dt = new Date(y, mo - 1, d)
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return ''
+    return `${yyyy}-${mm}-${dd}`
+  }
+  return ''
+}
+
+export function createDefaultProfileExtras(): ProfileExtras {
+  return defaultExtras()
+}
+
 const defaultExtras = (): ProfileExtras => ({
   firstName: '',
   lastName: '',
   phone: '',
+  phoneTel: '',
   email: '',
   birthday: '',
   country: 'Россия',
@@ -62,9 +97,42 @@ function isReceiveMethod(v: unknown): v is NotificationReceiveMethod {
   return v === 'sms' || v === 'email' || v === 'all'
 }
 
-function readExtras(): ProfileExtras {
+/** Синхронизирует `phoneTel` и форматированный `phone` (для таблиц и API), в т.ч. после старых сохранений. */
+export function migrateProfileExtrasPhoneFields(e: ProfileExtras): ProfileExtras {
+  let phoneTel = (e.phoneTel ?? '').replace(/\D/g, '').slice(0, PHONE_INPUT_MAX_DIGITS)
+  if (!phoneTel && e.phone) {
+    phoneTel = e.phone.replace(/\D/g, '').slice(0, PHONE_INPUT_MAX_DIGITS)
+  }
+  const p = parsePhoneTel(phoneTel)
+  const nat = phoneEffectiveNationalDigits(p, phoneTel)
+  const phone = nat ? composePhoneDisplay(p.dial, nat) : e.phone || ''
+  return { ...e, phoneTel, phone }
+}
+
+/** Строка клиента из админки / API → поля формы профиля. */
+export function profileExtrasFromClientTableRow(row: {
+  email?: string
+  firstName?: string
+  lastName?: string
+  phone?: string
+  profile?: Partial<ProfileExtras> | Record<string, unknown> | null
+}): ProfileExtras {
+  const d = createDefaultProfileExtras()
+  const p =
+    row.profile && typeof row.profile === 'object' && !Array.isArray(row.profile)
+      ? (row.profile as Partial<ProfileExtras>)
+      : {}
+  const merged: ProfileExtras = { ...d, ...p }
+  merged.email = row.email ?? merged.email
+  merged.firstName = row.firstName ?? merged.firstName
+  merged.lastName = row.lastName ?? merged.lastName
+  merged.phone = row.phone ?? merged.phone
+  return migrateProfileExtrasPhoneFields(merged)
+}
+
+function readExtras(accountEmail: string): ProfileExtras {
   try {
-    const raw = localStorage.getItem(PROFILE_EXTRAS_KEY)
+    const raw = getProfileExtrasJsonRawForAccount(accountEmail)
     if (!raw) return defaultExtras()
     const p = JSON.parse(raw) as Record<string, unknown>
     const {
@@ -106,18 +174,18 @@ function readExtras(): ProfileExtras {
 
     const c = merged.country
     if (c && LEGACY_COUNTRY_LABEL[c]) merged.country = LEGACY_COUNTRY_LABEL[c]
-    return merged
+    return migrateProfileExtrasPhoneFields(merged)
   } catch {
-    return defaultExtras()
+    return migrateProfileExtrasPhoneFields(defaultExtras())
   }
 }
 
-function writeExtras(e: ProfileExtras) {
-  localStorage.setItem(PROFILE_EXTRAS_KEY, JSON.stringify(e))
+function writeExtras(accountEmail: string, e: ProfileExtras) {
+  localStorage.setItem(profileExtrasStorageKey(accountEmail), JSON.stringify(e))
 }
 
 function buildFormFromUser(user: AuthUser, extras: ProfileExtras): ProfileExtras {
-  return {
+  return migrateProfileExtrasPhoneFields({
     ...extras,
     firstName: extras.firstName || user.firstName || '',
     lastName: extras.lastName || user.lastName || '',
@@ -125,33 +193,77 @@ function buildFormFromUser(user: AuthUser, extras: ProfileExtras): ProfileExtras
     email: extras.email || user.email,
     birthday: extras.birthday || user.birthday || '',
     streetAddress: extras.streetAddress || user.deliveryAddress || '',
-  }
+  })
+}
+
+export type ProfileFormAdminDraft = {
+  clientId: string
+  initialExtras: ProfileExtras
+  onPersist: (extras: ProfileExtras) => void
 }
 
 type ProfileFormProps = {
   /** После успешного сохранения (например закрыть модалку и показать тост). */
   onSaveSuccess?: () => void
+  /**
+   * Витрина: после сохранения с попыткой записи в БД клиентов (`PUT /api/profile/me` + JWT).
+   * Если не передан — при отсутствии adminDraft вызывается `onSaveSuccess`.
+   */
+  onStorefrontSaveDone?: (r: { serverSyncOk: boolean }) => void
+  /** Редактирование профиля клиента в админке — тот же вид формы, данные без привязки к аккаунту. */
+  adminDraft?: ProfileFormAdminDraft
 }
 
-export function ProfileForm({ onSaveSuccess }: ProfileFormProps) {
-  const { user, openAuthDialog } = useAuth()
+export function ProfileForm({ onSaveSuccess, onStorefrontSaveDone, adminDraft }: ProfileFormProps) {
+  const { user, sessionJwt, openAuthDialog } = useAuth()
   const [form, setForm] = useState<ProfileExtras | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const savedSnapshot = useRef<string>('')
 
   const hydrate = useCallback((u: AuthUser) => {
-    const merged = buildFormFromUser(u, readExtras())
+    const merged = buildFormFromUser(u, readExtras(u.email))
     setForm(merged)
     savedSnapshot.current = JSON.stringify(merged)
     setAvatarPreview(null)
   }, [])
 
   useEffect(() => {
+    if (adminDraft) return
     if (user) hydrate(user)
-  }, [user, hydrate])
+  }, [user, hydrate, adminDraft])
 
-  if (!user) {
+  useEffect(() => {
+    if (adminDraft || !user || !sessionJwt || !isSiteConfigApiExpected()) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const row = await fetchStorefrontClientMe(sessionJwt)
+        if (cancelled || !row) return
+        const next = buildFormFromUser(user, profileExtrasFromClientTableRow(row))
+        setForm(next)
+        savedSnapshot.current = JSON.stringify(next)
+      } catch {
+        /* без API или ошибка — остаётся hydrate + localStorage */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.email, adminDraft, user, sessionJwt])
+
+  useEffect(() => {
+    if (!adminDraft) return
+    const merged = migrateProfileExtrasPhoneFields({
+      ...createDefaultProfileExtras(),
+      ...adminDraft.initialExtras,
+    })
+    setForm(merged)
+    savedSnapshot.current = JSON.stringify(merged)
+    setAvatarPreview(null)
+  }, [adminDraft?.clientId])
+
+  if (!adminDraft && !user) {
     return (
       <div className="max-w-lg">
         <p className="text-gray-400">Войдите, чтобы просмотреть и изменить данные профиля.</p>
@@ -172,19 +284,58 @@ export function ProfileForm({ onSaveSuccess }: ProfileFormProps) {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev))
   }
 
-  const onSave = (e: FormEvent) => {
+  const onSave = async (e: FormEvent) => {
     e.preventDefault()
-    writeExtras(form)
+    if (!form) return
+
+    let serverSyncOk = true
+
+    if (adminDraft) {
+      adminDraft.onPersist(form)
+    } else {
+      if (!user) return
+      writeExtras(user.email, form)
+      const tryServer = Boolean(user) && Boolean(sessionJwt) && isSiteConfigApiExpected()
+      serverSyncOk = !tryServer
+      if (tryServer && user && sessionJwt) {
+        try {
+          await putStorefrontClientProfileMe(sessionJwt, {
+            firstName: form.firstName,
+            lastName: form.lastName,
+            phone: form.phone,
+            profile: form,
+          })
+          window.dispatchEvent(new Event(CLIENTS_UPDATED_EVENT))
+          serverSyncOk = true
+        } catch {
+          serverSyncOk = false
+        }
+      }
+    }
+
     savedSnapshot.current = JSON.stringify(form)
-    onSaveSuccess?.()
+    if (adminDraft) {
+      onSaveSuccess?.()
+    } else if (onStorefrontSaveDone) {
+      onStorefrontSaveDone({ serverSyncOk })
+    } else {
+      onSaveSuccess?.()
+    }
   }
 
   const onCancel = () => {
     try {
       const parsed = JSON.parse(savedSnapshot.current) as ProfileExtras
-      setForm(parsed)
+      setForm(migrateProfileExtrasPhoneFields(parsed))
     } catch {
-      hydrate(user)
+      if (user) hydrate(user)
+      else if (adminDraft) {
+        const merged = migrateProfileExtrasPhoneFields({
+          ...createDefaultProfileExtras(),
+          ...adminDraft.initialExtras,
+        })
+        setForm(merged)
+      }
     }
     setAvatarPreview(null)
   }
@@ -206,138 +357,140 @@ export function ProfileForm({ onSaveSuccess }: ProfileFormProps) {
               — фото, имя, контакты, дату рождения и всё остальное, чем готовы поделиться.
             </p>
 
-            <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div className="col-span-full sm:col-span-3">
-                <p className="block text-sm/6 font-medium text-white">Фото</p>
-                <div className="mt-2 flex items-center gap-x-3">
-                  {avatarPreview || user.yandexAvatarUrl ? (
-                    <img
-                      src={avatarPreview ?? user.yandexAvatarUrl!}
-                      alt=""
-                      className="size-12 rounded-full border border-white/10 object-cover"
-                    />
-                  ) : (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      aria-hidden
-                      className="size-12 text-gray-500"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        clipRule="evenodd"
-                        d="M18.685 19.097A9.723 9.723 0 0 0 21.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 0 0 3.065 7.097A9.716 9.716 0 0 0 12 21.75a9.716 9.716 0 0 0 6.685-2.653Zm-12.54-1.285A7.486 7.486 0 0 1 12 15a7.486 7.486 0 0 1 5.855 2.812A8.224 8.224 0 0 1 12 20.25a8.224 8.224 0 0 1-5.855-2.438ZM15.75 9a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"
+            {/* Одна сетка: на мобильной порядок — фото|почта, имя|фамилия, телефон|дата; на sm+ — фото|почта|телефон и имя|фамилия|дата */}
+            <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-8">
+                <div className="order-1 min-w-0 sm:order-1">
+                  <p className="block text-sm/6 font-medium text-white">Фото</p>
+                  <div className="mt-2 flex items-center gap-2 sm:mt-3 sm:gap-3">
+                    {avatarPreview || (!adminDraft && user?.yandexAvatarUrl) ? (
+                      <img
+                        src={(avatarPreview ?? (!adminDraft ? user?.yandexAvatarUrl : undefined)) as string}
+                        alt=""
+                        className="size-12 shrink-0 rounded-full border border-white/10 object-cover"
                       />
-                    </svg>
-                  )}
-                  <input
-                    ref={avatarInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/gif,image/webp"
-                    className="sr-only"
-                    onChange={(ev) => {
-                      const f = ev.target.files?.[0]
-                      if (f) readFileAsDataUrl(f, setAvatarPreview)
+                    ) : (
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden
+                        className="size-12 shrink-0 text-gray-500"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          clipRule="evenodd"
+                          d="M18.685 19.097A9.723 9.723 0 0 0 21.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 0 0 3.065 7.097A9.716 9.716 0 0 0 12 21.75a9.716 9.716 0 0 0 6.685-2.653Zm-12.54-1.285A7.486 7.486 0 0 1 12 15a7.486 7.486 0 0 1 5.855 2.812A8.224 8.224 0 0 1 12 20.25a8.224 8.224 0 0 1-5.855-2.438ZM15.75 9a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"
+                        />
+                      </svg>
+                    )}
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      className="sr-only"
+                      onChange={(ev) => {
+                        const f = ev.target.files?.[0]
+                        if (f) readFileAsDataUrl(f, setAvatarPreview)
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-inset ring-white/10 transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 sm:size-11"
+                      aria-label="Загрузить или сменить фото"
+                    >
+                      <CameraIcon className="size-5" strokeWidth={1.75} aria-hidden />
+                    </button>
+                  </div>
+                </div>
+                <div className="order-2 min-w-0 sm:order-2">
+                  <label htmlFor="email" className="block text-sm/6 font-medium text-white">
+                    Электронная почта
+                  </label>
+                  <div className="mt-2">
+                    <input
+                      id="email"
+                      type="email"
+                      name="email"
+                      autoComplete="email"
+                      value={form.email}
+                      onChange={(ev) => setField('email', ev.target.value)}
+                      className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
+                    />
+                  </div>
+                </div>
+                <div className="order-3 min-w-0 sm:order-4">
+                  <label htmlFor="first-name" className="block text-sm/6 font-medium text-white">
+                    Имя
+                  </label>
+                  <div className="mt-2">
+                    <input
+                      id="first-name"
+                      type="text"
+                      name="first-name"
+                      autoComplete="given-name"
+                      value={form.firstName}
+                      onChange={(ev) => setField('firstName', ev.target.value)}
+                      className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
+                    />
+                  </div>
+                </div>
+                <div className="order-4 min-w-0 sm:order-5">
+                  <label htmlFor="last-name" className="block text-sm/6 font-medium text-white">
+                    Фамилия
+                  </label>
+                  <div className="mt-2">
+                    <input
+                      id="last-name"
+                      type="text"
+                      name="last-name"
+                      autoComplete="family-name"
+                      value={form.lastName}
+                      onChange={(ev) => setField('lastName', ev.target.value)}
+                      className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
+                    />
+                  </div>
+                </div>
+                <div className="order-5 min-w-0 max-w-full sm:order-3 sm:max-w-[26rem]">
+                  <label htmlFor="phone" className="block text-sm/6 font-medium text-gray-300">
+                    Телефон
+                  </label>
+                  <ContactPhoneField
+                    id="phone"
+                    name="phone"
+                    variant="admin"
+                    valueTel={form.phoneTel}
+                    onDigitsChange={(digits) => {
+                      setForm((prev) => {
+                        if (!prev) return prev
+                        const p = parsePhoneTel(digits)
+                        const nat = phoneEffectiveNationalDigits(p, digits)
+                        return {
+                          ...prev,
+                          phoneTel: digits,
+                          phone: nat ? composePhoneDisplay(p.dial, nat) : '',
+                        }
+                      })
                     }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => avatarInputRef.current?.click()}
-                    className="rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/5 hover:bg-white/20"
-                  >
-                    Изменить
-                  </button>
                 </div>
-              </div>
-
-              <div className="col-span-full sm:col-span-3">
-                <label htmlFor="birthday" className="block text-sm/6 font-medium text-white">
-                  Дата рождения
-                </label>
-                <div className="mt-2">
-                  <input
-                    id="birthday"
-                    type="text"
-                    name="birthday"
-                    autoComplete="bday"
-                    inputMode="numeric"
-                    placeholder="ДД.ММ.ГГГГ"
-                    value={form.birthday}
-                    onChange={(ev) => setField('birthday', ev.target.value)}
-                    className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
-                  />
+                <div className="order-6 min-w-0 sm:order-6">
+                  <label htmlFor="birthday" className="block text-sm/6 font-medium text-white">
+                    Дата рождения
+                  </label>
+                  <div className="mt-2">
+                    <input
+                      id="birthday"
+                      type="date"
+                      name="birthday"
+                      autoComplete="bday"
+                      min="1900-01-01"
+                      max={new Date().toISOString().slice(0, 10)}
+                      value={birthdayStorageToDateInputValue(form.birthday)}
+                      onChange={(ev) => setField('birthday', ev.target.value)}
+                      className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline-1 -outline-offset-1 outline-white/10 [color-scheme:dark] focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
+                    />
+                  </div>
                 </div>
-              </div>
-
-              <div className="sm:col-span-3">
-                <label htmlFor="first-name" className="block text-sm/6 font-medium text-white">
-                  Имя
-                </label>
-                <div className="mt-2">
-                  <input
-                    id="first-name"
-                    type="text"
-                    name="first-name"
-                    autoComplete="given-name"
-                    value={form.firstName}
-                    onChange={(ev) => setField('firstName', ev.target.value)}
-                    className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-3">
-                <label htmlFor="last-name" className="block text-sm/6 font-medium text-white">
-                  Фамилия
-                </label>
-                <div className="mt-2">
-                  <input
-                    id="last-name"
-                    type="text"
-                    name="last-name"
-                    autoComplete="family-name"
-                    value={form.lastName}
-                    onChange={(ev) => setField('lastName', ev.target.value)}
-                    className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-3">
-                <label htmlFor="phone" className="block text-sm/6 font-medium text-white">
-                  Телефон
-                </label>
-                <div className="mt-2">
-                  <input
-                    id="phone"
-                    type="tel"
-                    name="phone"
-                    autoComplete="tel"
-                    inputMode="tel"
-                    value={form.phone}
-                    onChange={(ev) => setField('phone', ev.target.value)}
-                    placeholder="+7 900 000-00-00"
-                    className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-3">
-                <label htmlFor="email" className="block text-sm/6 font-medium text-white">
-                  Электронная почта
-                </label>
-                <div className="mt-2">
-                  <input
-                    id="email"
-                    type="email"
-                    name="email"
-                    autoComplete="email"
-                    value={form.email}
-                    onChange={(ev) => setField('email', ev.target.value)}
-                    className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
-                  />
-                </div>
-              </div>
             </div>
           </div>
 
@@ -348,8 +501,8 @@ export function ProfileForm({ onSaveSuccess }: ProfileFormProps) {
               доставка пройдёт спокойнее и без лишних уточнений.
             </p>
 
-            <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div className="sm:col-span-2">
+            <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-6 sm:gap-x-6 sm:gap-y-8">
+              <div className="col-span-1 min-w-0 sm:col-span-2">
                 <label htmlFor="country" className="block text-sm/6 font-medium text-white">
                   Страна
                 </label>
@@ -384,7 +537,7 @@ export function ProfileForm({ onSaveSuccess }: ProfileFormProps) {
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="col-span-1 min-w-0 sm:col-span-2">
                 <label htmlFor="region" className="block text-sm/6 font-medium text-white">
                   Регион / область
                 </label>
@@ -401,7 +554,7 @@ export function ProfileForm({ onSaveSuccess }: ProfileFormProps) {
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="col-span-1 min-w-0 sm:col-span-2">
                 <label htmlFor="city" className="block text-sm/6 font-medium text-white">
                   Город
                 </label>
@@ -418,7 +571,7 @@ export function ProfileForm({ onSaveSuccess }: ProfileFormProps) {
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="col-span-1 min-w-0 sm:col-span-2">
                 <label htmlFor="postal-code" className="block text-sm/6 font-medium text-white">
                   Индекс
                 </label>
@@ -435,7 +588,7 @@ export function ProfileForm({ onSaveSuccess }: ProfileFormProps) {
                 </div>
               </div>
 
-              <div className="sm:col-span-4">
+              <div className="col-span-2 sm:col-span-4">
                 <label htmlFor="street-address" className="block text-sm/6 font-medium text-white">
                   Адрес (улица, дом)
                 </label>

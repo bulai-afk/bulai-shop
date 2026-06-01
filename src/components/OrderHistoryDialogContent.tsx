@@ -1,6 +1,7 @@
 import { CheckCircleIcon } from '@heroicons/react/24/solid'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { formatDateRuFromIso } from '../utils/formatDateRu'
 
 type OrderLine = {
   id: string
@@ -23,8 +24,8 @@ type OrderLine = {
 
 type Order = {
   orderNumber: string
+  /** Дата оформления `YYYY-MM-DD`; на экране — ДД.ММ.ГГГГ. */
   placedIso: string
-  placedLabel: string
   /** Сумма по каталогу до скидок. */
   subtotalRub: number
   /** Скидка по заказу. */
@@ -42,7 +43,6 @@ const MOCK_ORDERS: Order[] = [
   {
     orderNumber: 'WU88191111',
     placedIso: '2021-01-22',
-    placedLabel: '22 января 2021',
     subtotalRub: 26_600,
     orderDiscountRub: 2800,
     totalRub: 23_800,
@@ -99,7 +99,6 @@ const MOCK_ORDERS: Order[] = [
   {
     orderNumber: 'WU88191009',
     placedIso: '2021-01-05',
-    placedLabel: '5 января 2021',
     subtotalRub: 18_500,
     orderDiscountRub: 7000,
     totalRub: 11_500,
@@ -153,6 +152,35 @@ function formatDiscountRub(amount: number) {
   return `−${amount.toLocaleString('ru-RU')} ₽`
 }
 
+/** «Доставлено 23.04.2026» → префикс + дата (галочку показываем сразу после даты). */
+function splitStatusPrefixAndTrailingDate(text: string): { prefix: string; date: string } | null {
+  const m = /^(.+?)\s+(\d{2}\.\d{2}\.\d{4})$/.exec(text.trim())
+  if (!m) return null
+  return { prefix: m[1].trimEnd(), date: m[2] }
+}
+
+function DeliveredStatusPill({ statusText }: { statusText: string }) {
+  const parts = splitStatusPrefixAndTrailingDate(statusText)
+  return (
+    <span className="inline-flex max-w-full flex-nowrap items-center gap-x-1.5 text-emerald-400 whitespace-nowrap">
+      {parts ? (
+        <>
+          <span className="font-medium leading-snug">{parts.prefix}</span>
+          <span className="inline-flex items-center gap-1 font-medium leading-none tabular-nums">
+            <span>{parts.date}</span>
+            <CheckCircleIcon className="size-[1.125rem] shrink-0 text-emerald-300" aria-hidden />
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="min-w-0 break-words font-medium leading-snug">{statusText}</span>
+          <CheckCircleIcon className="size-[1.125rem] shrink-0 text-emerald-300" aria-hidden />
+        </>
+      )}
+    </span>
+  )
+}
+
 export function OrderHistoryDialogContent() {
   const { user, openAuthDialog } = useAuth()
 
@@ -186,36 +214,80 @@ export function OrderHistoryDialogContent() {
         {MOCK_ORDERS.map((order) => (
           <div key={order.orderNumber}>
             <h4 className="text-base font-medium text-white">
-              Заказ от <time dateTime={order.placedIso}>{order.placedLabel}</time>
+              Заказ от{' '}
+              <time dateTime={order.placedIso}>{formatDateRuFromIso(order.placedIso)}</time>
             </h4>
 
             <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
-              <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-[minmax(11rem,2.2fr)_minmax(9rem,1.9fr)_minmax(12.5rem,2.7fr)_minmax(5.25rem,0.68fr)_minmax(5rem,0.62fr)_minmax(5.5rem,0.72fr)]">
+              {/* Узкая ширина: 70/30, слева реквизиты заказа, справа суммы */}
+              <div className="grid grid-cols-[7fr_3fr] gap-4 text-sm sm:gap-8 lg:hidden">
+                <div className="min-w-0 space-y-4">
+                  <div className="min-w-0">
+                    <div className="font-medium text-white">Номер заказа</div>
+                    <div className="mt-2 w-full break-words text-gray-400 max-sm:break-all">{order.orderNumber}</div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-white">Дата оформления</div>
+                    <div className="mt-2 w-full text-gray-400">
+                      <time
+                        dateTime={order.placedIso}
+                        className="inline-block max-w-full whitespace-nowrap"
+                      >
+                        {formatDateRuFromIso(order.placedIso)}
+                      </time>
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-white">Статус заказа</div>
+                    <div className="mt-2 min-w-0 overflow-x-auto">
+                      {order.orderDelivered ? (
+                        <DeliveredStatusPill statusText={order.orderStatusText} />
+                      ) : (
+                        <span className="text-gray-200">{order.orderStatusText}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="min-w-0 space-y-4">
+                  <div className="min-w-0">
+                    <div className="font-medium text-white">Сумма</div>
+                    <div className="mt-2 w-full font-medium text-white tabular-nums">{formatRub(order.subtotalRub)}</div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-white">Скидка</div>
+                    <div className="mt-2 w-full font-medium text-emerald-400/95 tabular-nums">
+                      {formatDiscountRub(order.orderDiscountRub)}
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-white">Итого</div>
+                    <div className="mt-2 w-full font-semibold text-white tabular-nums">{formatRub(order.totalRub)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Десктоп: 1-й ряд — номер, дата, статус; 2-й — сумма, скидка, итого */}
+              <div className="hidden text-sm lg:grid lg:grid-cols-3 lg:gap-x-10 lg:gap-y-8">
+                <div className="min-w-0">
+                  <div className="font-medium text-white">Номер заказа</div>
+                  <div className="mt-2 w-full break-words text-gray-400">{order.orderNumber}</div>
+                </div>
                 <div className="min-w-0">
                   <div className="font-medium text-white">Дата оформления</div>
                   <div className="mt-2 w-full text-gray-400">
                     <time
                       dateTime={order.placedIso}
-                      className="inline-block max-w-full lg:whitespace-nowrap"
+                      className="inline-block max-w-full whitespace-nowrap"
                     >
-                      {order.placedLabel}
+                      {formatDateRuFromIso(order.placedIso)}
                     </time>
                   </div>
-                </div>
-                <div className="min-w-0">
-                  <div className="font-medium text-white">Номер заказа</div>
-                  <div className="mt-2 w-full break-words text-gray-400 max-sm:break-all">{order.orderNumber}</div>
                 </div>
                 <div className="min-w-0">
                   <div className="font-medium text-white">Статус заказа</div>
                   <div className="mt-2 min-w-0">
                     {order.orderDelivered ? (
-                      <div className="inline-flex max-w-full flex-nowrap items-start gap-x-1">
-                        <span className="min-w-0 break-words font-medium leading-snug text-emerald-400">
-                          {order.orderStatusText}
-                        </span>
-                        <CheckCircleIcon className="size-5 shrink-0 text-emerald-400" aria-hidden />
-                      </div>
+                      <DeliveredStatusPill statusText={order.orderStatusText} />
                     ) : (
                       <span className="text-gray-200">{order.orderStatusText}</span>
                     )}
@@ -258,25 +330,85 @@ export function OrderHistoryDialogContent() {
                     <th scope="col" className="hidden py-3 pr-4 font-medium sm:table-cell sm:pr-8">
                       Количество
                     </th>
-                    <th scope="col" className="py-3 pl-0 pr-0 text-right font-medium sm:text-left">
-                      Подробнее
+                    <th
+                      scope="col"
+                      className="w-[1%] whitespace-nowrap py-3 pl-2 pr-1 text-right font-medium sm:pl-2 sm:pr-2 sm:text-left"
+                    >
+                      Детали
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {order.lines.map((line) => (
                     <tr key={line.id}>
-                      <td className="py-6 pr-4 sm:pr-8">
-                        <div className="flex items-center gap-4">
+                      <td className="align-middle py-6 pr-4 sm:pr-8">
+                        <div className="flex flex-col gap-3 sm:hidden">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={line.imageSrc}
+                              alt={line.imageAlt}
+                              className="size-20 shrink-0 rounded-md border border-white/10 object-cover"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div>
+                                <div className="text-xs font-medium text-gray-500">Название</div>
+                                <div className="mt-0.5 font-medium text-white">{line.name}</div>
+                              </div>
+                              <dl className="mt-2 grid gap-y-0.5 text-xs text-gray-400">
+                                <div className="flex flex-wrap gap-x-2">
+                                  <dt className="text-gray-500">Цена</dt>
+                                  <dd className="m-0 tabular-nums text-gray-300">{formatRub(line.priceRub)}</dd>
+                                </div>
+                                <div className="flex flex-wrap gap-x-2">
+                                  <dt className="text-gray-500">Скидка</dt>
+                                  <dd className="m-0 tabular-nums text-emerald-400/90">
+                                    {formatDiscountRub(line.lineDiscountRub)}
+                                  </dd>
+                                </div>
+                                <div className="flex flex-wrap gap-x-2">
+                                  <dt className="text-gray-500">Итоговая цена</dt>
+                                  <dd className="m-0 font-medium tabular-nums text-white">
+                                    {formatRub(line.lineTotalRub)}
+                                  </dd>
+                                </div>
+                                <div className="flex flex-wrap gap-x-2">
+                                  <dt className="text-gray-500">Количество</dt>
+                                  <dd className="m-0 tabular-nums text-gray-300">{formatQty(line.quantity)}</dd>
+                                </div>
+                              </dl>
+                            </div>
+                          </div>
+                          <p className="flex min-w-0 flex-nowrap items-center gap-x-3 overflow-x-auto text-sm text-gray-400">
+                            <span className="inline-flex shrink-0 items-baseline gap-1">
+                              <span className="text-gray-500">Размер:</span>
+                              <span className="tabular-nums text-gray-300">{line.size}</span>
+                            </span>
+                            <span className="inline-flex shrink-0 items-center gap-2">
+                              <span className="text-gray-500">Цвет:</span>
+                              <span
+                                className="size-4 shrink-0 rounded-full border border-white/20 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.15)]"
+                                style={{ backgroundColor: line.colorSwatch }}
+                                title={line.color}
+                                aria-hidden
+                              />
+                              <span className="text-gray-300">{line.color}</span>
+                            </span>
+                          </p>
+                        </div>
+                        <div className="hidden items-center gap-4 sm:flex">
                           <img
                             src={line.imageSrc}
                             alt={line.imageAlt}
-                            className="size-16 shrink-0 rounded-md border border-white/10 object-cover sm:size-20"
+                            className="size-20 shrink-0 rounded-md border border-white/10 object-cover"
                           />
                           <div>
                             <div className="font-medium text-white">{line.name}</div>
-                            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-400">
-                              <span className="inline-flex items-center gap-2">
+                            <p className="mt-1 flex flex-nowrap items-center gap-x-3 text-sm text-gray-400">
+                              <span className="inline-flex shrink-0 items-baseline gap-1">
+                                <span className="text-gray-500">Размер:</span>
+                                <span className="tabular-nums text-gray-300">{line.size}</span>
+                              </span>
+                              <span className="inline-flex shrink-0 items-center gap-2">
                                 <span className="text-gray-500">Цвет:</span>
                                 <span
                                   className="size-4 shrink-0 rounded-full border border-white/20 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.15)]"
@@ -286,56 +418,28 @@ export function OrderHistoryDialogContent() {
                                 />
                                 <span>{line.color}</span>
                               </span>
-                              <span className="text-white/25" aria-hidden>
-                                ·
-                              </span>
-                              <span>
-                                <span className="text-gray-500">Размер:</span>{' '}
-                                <span className="tabular-nums text-gray-300">{line.size}</span>
-                              </span>
                             </p>
-                            <div className="mt-2 space-y-0.5 text-xs sm:hidden">
-                              <div>
-                                <span className="text-gray-500">Цена:</span>{' '}
-                                <span className="tabular-nums text-gray-300">{formatRub(line.priceRub)}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Скидка:</span>{' '}
-                                <span className="tabular-nums text-emerald-400/90">
-                                  {formatDiscountRub(line.lineDiscountRub)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Итоговая цена:</span>{' '}
-                                <span className="tabular-nums font-medium text-white">
-                                  {formatRub(line.lineTotalRub)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Количество:</span>{' '}
-                                <span className="tabular-nums text-gray-300">{formatQty(line.quantity)}</span>
-                              </div>
-                            </div>
                           </div>
                         </div>
                       </td>
-                      <td className="hidden py-6 pr-8 sm:table-cell tabular-nums">{formatRub(line.priceRub)}</td>
-                      <td className="hidden py-6 pr-8 md:table-cell tabular-nums text-emerald-400/90">
+                      <td className="hidden align-middle py-6 pr-8 sm:table-cell tabular-nums">
+                        {formatRub(line.priceRub)}
+                      </td>
+                      <td className="hidden align-middle py-6 pr-8 md:table-cell tabular-nums text-emerald-400/90">
                         {formatDiscountRub(line.lineDiscountRub)}
                       </td>
-                      <td className="hidden py-6 pr-8 md:table-cell font-medium tabular-nums text-white">
+                      <td className="hidden align-middle py-6 pr-8 md:table-cell font-medium tabular-nums text-white">
                         {formatRub(line.lineTotalRub)}
                       </td>
-                      <td className="hidden py-6 pr-8 sm:table-cell tabular-nums">
+                      <td className="hidden align-middle py-6 pr-8 sm:table-cell tabular-nums">
                         {formatQty(line.quantity)}
                       </td>
-                      <td className="py-6 text-right sm:text-left">
+                      <td className="w-[1%] whitespace-nowrap align-middle py-6 pl-2 pr-1 text-right sm:pl-2 sm:pr-2 sm:text-left">
                         <Link
                           to={line.productHref}
-                          className="font-medium text-indigo-400 hover:text-indigo-300"
+                          className="inline-block min-w-0 font-medium text-indigo-400 hover:text-indigo-300"
                         >
-                          <span className="hidden sm:inline">К товару</span>
-                          <span className="sm:hidden">Товар</span>
+                          Товар
                           <span className="sr-only">
                             , {line.name}, цвет {line.color}, размер {line.size}
                           </span>

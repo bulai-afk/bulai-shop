@@ -65,7 +65,7 @@ export const FaqAccordion = forwardRef<HTMLElement>(function FaqAccordion(_, ref
           <p className="text-base/7 font-semibold text-indigo-400">FAQ</p>
           <h2
             id="faq-heading"
-            className="mt-2 text-4xl font-semibold tracking-tight text-white sm:text-5xl"
+            className="mt-2 text-center text-4xl font-semibold tracking-tight text-white sm:text-5xl"
           >
             Отвечаем на частые вопросы
           </h2>

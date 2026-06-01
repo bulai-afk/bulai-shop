@@ -8,15 +8,44 @@ import {
   type ReactNode,
 } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { postEmailSessionToken, postYandexSessionToken } from '../api/authSessionApi'
 import {
   deriveProfileFromYandexLoginInfo,
   emailFromYandexInfo,
   extractYandexOAuthToken,
   fetchYandexLoginInfo,
 } from '../api/yandexLoginInfo'
+import { SESSION_JWT_STORAGE_KEY } from '../constants/sessionJwtStorage'
 import { YANDEX_AUTH_SUCCESS_PARAM } from '../constants/yandexAuth'
 
 const STORAGE_KEY = 'bulai-shop-auth'
+
+function b64UrlToBinarySegment(segment: string): string {
+  const pad = segment.length % 4 === 0 ? '' : '='.repeat(4 - (segment.length % 4))
+  return atob(segment.replace(/-/g, '+').replace(/_/g, '/') + pad)
+}
+
+function readSessionJwtFromStorage(): string | null {
+  try {
+    const t = localStorage.getItem(SESSION_JWT_STORAGE_KEY)
+    if (!t?.trim()) return null
+    const parts = t.split('.')
+    if (parts.length < 2) return null
+    const payload = JSON.parse(b64UrlToBinarySegment(parts[1])) as { exp?: number }
+    if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem(SESSION_JWT_STORAGE_KEY)
+      return null
+    }
+    return t
+  } catch {
+    return null
+  }
+}
+
+function persistSessionJwt(token: string | null) {
+  if (token) localStorage.setItem(SESSION_JWT_STORAGE_KEY, token)
+  else localStorage.removeItem(SESSION_JWT_STORAGE_KEY)
+}
 
 export type AuthUser = {
   email: string
@@ -44,6 +73,8 @@ type AuthDialogOptions = {
 
 type AuthContextValue = {
   user: AuthUser | null
+  /** JWT для /api/profile/me (после обмена Яндекс-токена или dev email-сессии). */
+  sessionJwt: string | null
   isAuthenticated: boolean
   hydrated: boolean
   authDialogOpen: boolean
@@ -98,12 +129,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [user, setUser] = useState<AuthUser | null>(null)
+  const [sessionJwt, setSessionJwt] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
   const [authDialogMode, setAuthDialogMode] = useState<'signin' | 'signup'>('signin')
 
   useEffect(() => {
     setUser(readStoredUser())
+    setSessionJwt(readSessionJwtFromStorage())
     setHydrated(true)
   }, [])
 
@@ -149,6 +182,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         persistUser(nextUser)
         setAuthDialogOpen(false)
 
+        if (token) {
+          try {
+            const jwt = await postYandexSessionToken(token)
+            persistSessionJwt(jwt)
+            setSessionJwt(jwt)
+          } catch {
+            persistSessionJwt(null)
+            setSessionJwt(null)
+          }
+        } else {
+          persistSessionJwt(null)
+          setSessionJwt(null)
+        }
+
         const params = new URLSearchParams(location.search)
         params.set(YANDEX_AUTH_SUCCESS_PARAM, '1')
         const q = params.toString()
@@ -174,6 +221,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setUser(null)
     persistUser(null)
+    persistSessionJwt(null)
+    setSessionJwt(null)
   }, [])
 
   const signInWithEmail = useCallback((email: string, _password: string) => {
@@ -183,6 +232,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(next)
     persistUser(next)
     setAuthDialogOpen(false)
+    void (async () => {
+      try {
+        const jwt = await postEmailSessionToken(trimmed)
+        persistSessionJwt(jwt)
+        setSessionJwt(jwt)
+      } catch {
+        persistSessionJwt(null)
+        setSessionJwt(null)
+      }
+    })()
   }, [])
 
   const signUpWithEmail = useCallback((email: string, _password: string) => {
@@ -192,6 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       user,
+      sessionJwt,
       isAuthenticated: user !== null,
       hydrated,
       authDialogOpen,
@@ -204,6 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       user,
+      sessionJwt,
       hydrated,
       authDialogOpen,
       authDialogMode,

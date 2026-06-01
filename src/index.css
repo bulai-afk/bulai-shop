@@ -21,6 +21,33 @@ body {
   height: 100dvh;
   overflow-y: auto;
   scrollbar-width: none; /* Firefox: hide system scrollbar */
+  /* Перенос по слогам (нужен `lang` на `<html>`, у нас `lang="ru"`). */
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  text-align: justify;
+  text-justify: inter-word;
+}
+
+/* Заголовки не наследуют выравнивание по ширине — иначе растягиваются пробелы между словами. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-align: start;
+}
+
+/* Родитель с `text-center` / `text-center lg:text-left` задаёт выравнивание детям через наследование,
+   но правило выше фиксирует `start` на самом теге — без этого заголовки остаются слева. :where() —
+   низкая специфичность, чтобы `text-left` / `sm:text-left` на заголовке по-прежнему имели приоритет. */
+:where(.text-center) h1,
+:where(.text-center) h2,
+:where(.text-center) h3,
+:where(.text-center) h4,
+:where(.text-center) h5,
+:where(.text-center) h6 {
+  text-align: inherit;
 }
 
 body::-webkit-scrollbar {
@@ -62,4 +89,29 @@ body::-webkit-scrollbar {
   width: 0;
   height: 0;
   display: none;
+}
+
+/* Горизонтальный скролл для широких таблиц админки (фиолетовый, как в кастомных ползунках). */
+.stable-scroll-x-purple {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(129, 140, 248, 0.85) transparent;
+}
+
+.stable-scroll-x-purple::-webkit-scrollbar {
+  height: 10px;
+}
+
+.stable-scroll-x-purple::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.stable-scroll-x-purple::-webkit-scrollbar-thumb {
+  background-color: rgba(129, 140, 248, 0.85);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.stable-scroll-x-purple::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(129, 140, 248, 1);
 }

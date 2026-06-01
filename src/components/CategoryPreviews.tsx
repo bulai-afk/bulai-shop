@@ -1,42 +1,15 @@
-import { forwardRef } from 'react'
+import { forwardRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { catalogHrefForPromoSlug } from '../constants/catalogCategoryPromo'
+import { useStorefrontPromoMaterials } from '../context/StorefrontSettingsContext'
 
 type Category = {
   name: string
   description: string
   image: string
   href: string
-  /** Как у крупной карточки «Новинки»: жирный крупный заголовок и полное описание */
   featuredTitle?: boolean
 }
-
-const CATEGORIES: Category[] = [
-  {
-    name: 'Новинки',
-    description: 'Тренды сезона и базовые вещи — уже в продаже, собирайте комплименты с первого дня',
-    image:
-      'https://tailwindcss.com/plus-assets/img/ecommerce-images/mega-menu-category-01.jpg',
-    href: '/catalog',
-  },
-  {
-    name: 'Худи',
-    description:
-      'Худи и толстовки на каждый день — уже в продаже, мягкие и тёплые, садятся по фигуре и собирают комплименты с первого дня',
-    image:
-      'https://tailwindcss.com/plus-assets/img/ecommerce-images/mega-menu-category-02.jpg',
-    href: '/catalog',
-    featuredTitle: true,
-  },
-  {
-    name: 'Майки',
-    description:
-      'Майки и базовые футболки на каждый день — уже в продаже, садятся по фигуре и собирают комплименты с первого дня',
-    image:
-      'https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-06.jpg',
-    href: '/catalog',
-    featuredTitle: true,
-  },
-]
 
 const cardShell =
   'group relative flex flex-col overflow-hidden rounded-2xl bg-gray-800 shadow-md ring-1 ring-white/10 transition hover:shadow-xl hover:shadow-black/40 hover:ring-white/20'
@@ -48,7 +21,6 @@ function CategoryCard({
   cat: Category
   variant: 'large' | 'horizontal'
 }) {
-  /** До `lg` крупная «Новинки» совпадает с горизонтальными карточками; сетка 2 колонки только на больших экранах. */
   const sizeClass =
     variant === 'large'
       ? 'aspect-[2/1] min-h-[140px] w-full sm:min-h-[180px] lg:aspect-[3/4] lg:min-h-[min(72vh,560px)] lg:max-h-[640px]'
@@ -63,13 +35,9 @@ function CategoryCard({
   const compactDesc =
     'mt-1 line-clamp-3 text-sm/6 text-pretty text-white sm:mt-2 sm:text-base/7'
   const titleClass =
-    variant === 'large' || cat.featuredTitle
-      ? heroTitle
-      : compactTitle
+    variant === 'large' || cat.featuredTitle ? heroTitle : compactTitle
   const descClass =
-    variant === 'large' || cat.featuredTitle
-      ? heroDesc
-      : compactDesc
+    variant === 'large' || cat.featuredTitle ? heroDesc : compactDesc
 
   return (
     <Link to={cat.href} className={`${cardShell} ${sizeClass}`}>
@@ -82,10 +50,12 @@ function CategoryCard({
         aria-hidden
         className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent"
       />
-      <div className={`relative z-10 mt-auto flex w-full flex-col ${paddingClass}`}>
+      <div
+        className={`relative z-10 mt-auto flex w-full flex-col text-left ${paddingClass}`}
+      >
         <h3 className={titleClass}>{cat.name}</h3>
         <p className={descClass}>{cat.description}</p>
-        <span className="mt-2 inline-flex text-base/7 font-semibold text-white sm:mt-3">
+        <span className="mt-2 hidden text-base/7 font-semibold text-white sm:mt-3 sm:inline-flex">
           Смотреть
           <span aria-hidden className="ml-1 transition group-hover:translate-x-0.5">
             →
@@ -96,9 +66,28 @@ function CategoryCard({
   )
 }
 
-/** Блок категорий: крупная карточка + 2 горизонтальные рядом. */
+/** Блок категорий: крупная карточка + остальные в столбце (порядок из промо). */
 export const CategoryPreviews = forwardRef<HTMLElement>(function CategoryPreviews(_, ref) {
-  const [main, ...side] = CATEGORIES
+  const { categoryVisuals } = useStorefrontPromoMaterials()
+
+  const categories: Category[] = useMemo(
+    () =>
+      categoryVisuals.map((row) => ({
+        name: row.displayName,
+        description: row.descriptionHome,
+        image: row.imageHome,
+        href: catalogHrefForPromoSlug(row.slug),
+        featuredTitle: row.featuredTitle,
+      })),
+    [categoryVisuals],
+  )
+
+  const main = categories[0]
+  const side = categories.slice(1)
+
+  if (!main) {
+    return null
+  }
 
   return (
     <section
@@ -107,16 +96,16 @@ export const CategoryPreviews = forwardRef<HTMLElement>(function CategoryPreview
       aria-labelledby="category-previews-heading"
     >
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="flex flex-row items-end justify-between gap-3 sm:gap-4">
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3 sm:gap-4">
           <h2
             id="category-previews-heading"
-            className="min-w-0 text-4xl font-semibold tracking-tight text-white sm:text-5xl"
+            className="min-w-0 text-center text-4xl font-semibold tracking-tight text-white sm:text-left sm:text-5xl"
           >
             Категории
           </h2>
           <Link
             to="/catalog"
-            className="inline-flex shrink-0 items-center text-base/6 font-semibold text-indigo-400 transition hover:text-indigo-300"
+            className="hidden shrink-0 items-center text-base/6 font-semibold text-indigo-400 transition hover:text-indigo-300 sm:inline-flex"
           >
             Посетить каталог <span aria-hidden="true">→</span>
           </Link>
@@ -127,9 +116,9 @@ export const CategoryPreviews = forwardRef<HTMLElement>(function CategoryPreview
             <div className="min-h-0 min-w-0">
               <CategoryCard cat={main} variant="large" />
             </div>
-            <div className="grid min-h-0 gap-3 lg:h-full lg:min-h-0 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:self-stretch">
+            <div className="grid min-h-0 gap-3 lg:h-full lg:min-h-0 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] lg:self-stretch">
               {side.map((cat) => (
-                <CategoryCard key={cat.name} cat={cat} variant="horizontal" />
+                <CategoryCard key={cat.href} cat={cat} variant="horizontal" />
               ))}
             </div>
           </div>

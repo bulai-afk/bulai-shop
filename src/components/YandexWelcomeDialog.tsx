@@ -46,7 +46,7 @@ export function YandexWelcomeDialog() {
         >
           <div className="flex flex-col items-center text-center">
             <BulaiLogo className="h-8 w-auto text-violet-400" />
-            <DialogTitle className="mt-6 text-xl font-bold tracking-tight text-white">
+            <DialogTitle className="mt-6 text-center text-xl font-bold tracking-tight text-white">
               Добро пожаловать!
             </DialogTitle>
             <p className="mt-3 text-sm leading-6 text-gray-300">
