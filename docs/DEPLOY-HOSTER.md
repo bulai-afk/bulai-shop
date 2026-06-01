@@ -50,7 +50,8 @@ dig +short bulai.by A
 | Секрет | Описание |
 |--------|----------|
 | `DEPLOY_HOST` | **Только `87.232.64.14`** для bulai.by (ISPmanager). **Не** `vh151.hoster.by` / `93.125.99.153` |
-| `DEPLOY_USER` | **`bulaiby`** на 87.232 (не логин от vh151, если он другой) |
+| `DEPLOY_USER` | **`h202138`** для bulai.by на 87.232 (ключ `~/.ssh/deploy_bulai` на Mac) |
+| `DEPLOY_REMOTE_DIR` | **`www/bulai.by`** (не `bulai-shop`) |
 | `DEPLOY_SSH_KEY` | Приватный SSH-ключ (можно тот же) |
 | `VITE_YANDEX_CLIENT_ID` | OAuth Яндекс |
 | `VITE_YANDEX_REDIRECT_URI` | Необязательно: `https://домен/auth/yandex/callback` |
@@ -74,7 +75,18 @@ dig +short bulai.by A
 
 ### `Permission denied (publickey)`
 
-Сеть до сервера есть, но **ключ или логин не совпадают**. См. раздел в `docs/DEPLOY-ISPMANAGER.md`: `DEPLOY_USER` = SSH-логин на **87.232**, публичный ключ в панели, в Secret — приватный ключ целиком.
+Сеть до сервера есть, но **ключ или логин не совпадают**. См. `docs/DEPLOY-ISPMANAGER.md`.
+
+### GitHub Actions: `Connection timed out` на SSH (с Mac работает)
+
+Hoster часто **блокирует SSH с IP GitHub**. Секреты настроены, но Actions не дойдёт до сервера. Деплой с Mac:
+
+```bash
+chmod +x scripts/deploy-from-mac.sh
+./scripts/deploy-from-mac.sh
+```
+
+Вход на сервер: `ssh -4 -i ~/.ssh/deploy_bulai h202138@87.232.64.14`
 
 ## 3. Деплой
 
