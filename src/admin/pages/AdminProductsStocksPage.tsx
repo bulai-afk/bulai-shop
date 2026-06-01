@@ -30,19 +30,32 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { PanelScrollArea } from '../../components/PanelScrollArea'
 import { ProfileSaveToast } from '../../components/ProfileSaveToast'
 import { profileDialogPinnedScrollbarRailClass } from '../../components/scrollbarShared'
-import { fetchAdminProductsInventoryFromApi, putAdminProductsInventoryToApi } from '../../api/adminDataApi'
+import {
+  fetchAdminOrdersFromApi,
+  fetchAdminProductsInventoryFromApi,
+  putAdminProductsInventoryToApi,
+} from '../../api/adminDataApi'
 import { isSiteConfigApiExpected } from '../../constants/apiBase'
 import { getPageScrollElement } from '../../utils/getPageScrollElement'
 import { buildDefaultProductsInventory } from '../data/siteSettingsDefaults'
 import {
+  ORDERS_UPDATED_EVENT,
   PRODUCTS_INVENTORY_UPDATED_EVENT,
+  loadOrdersDraft,
   loadProductsInventoryDraft,
+  saveOrdersDraft,
   saveProductsInventoryDraft,
 } from '../lib/adminDraftStorage'
+import {
+  buildOrderMetricsFromAdminOrders,
+  orderMetricsFromMap,
+  resolvePrimaryWarehouseId,
+} from '../lib/stockOrdersFromAdmin'
 import {
   emptyWarehouseStock,
   getWarehouseStock,
   sumMetricsAcrossWarehouses,
+  withDerivedStock,
 } from '../lib/stockRowUtils'
 import type {
   ProductCatalogRow,
@@ -64,8 +77,6 @@ const settingsHintClass = 'text-xs text-gray-500'
 /** Общая рамка ячейки: ниже по высоте, содержимое по центру по вертикали. */
 const stocksCellFrameClass =
   'flex h-full min-h-[2.5rem] w-full min-w-0 items-center self-stretch rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5'
-const stocksQtyInputInFrameClass =
-  'h-8 w-full rounded border-0 bg-transparent px-1 text-center text-sm leading-none text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
 const sectionClass = 'rounded-lg border border-white/10 bg-gray-950/60 p-6 shadow-sm shadow-black/20'
 const WAREHOUSES_DIALOG_SCROLL_RAIL_TRIM_PX = 80
 
@@ -252,19 +263,6 @@ function receiptUnitsFromSupplies(
   return map.get(productId)?.get(warehouseId) ?? 0
 }
 
-/** Остаток в таблице: поступления − заказ − предзаказы − брак (журналы + введённые расходы). */
-function deriveStockFromBreakdown(b: WarehouseStockBreakdown): number {
-  const r = Math.max(0, Math.floor(Number(b.receipts) || 0))
-  const o = Math.max(0, Math.floor(Number(b.orders) || 0))
-  const pr = Math.max(0, Math.floor(Number(b.preorders) || 0))
-  const d = Math.max(0, Math.floor(Number(b.defects) || 0))
-  return r - o - pr - d
-}
-
-function withDerivedStock(row: WarehouseStockBreakdown): WarehouseStockBreakdown {
-  return { ...row, stock: deriveStockFromBreakdown(row) }
-}
-
 type SortKey = 'sku' | 'name' | 'receipts' | 'orders' | 'preorders' | 'defects' | 'stock'
 
 type StocksMainTab = 'all' | 'supplies' | 'defects' | 'suppliers'
@@ -272,14 +270,6 @@ type StocksMainTab = 'all' | 'supplies' | 'defects' | 'suppliers'
 type MetricField = keyof WarehouseStockBreakdown
 
 const METRIC_FIELDS = ['receipts', 'orders', 'preorders', 'defects', 'stock'] as const satisfies readonly MetricField[]
-
-const metricFieldLabel: Record<MetricField, string> = {
-  receipts: 'Поступления',
-  orders: 'Заказ',
-  preorders: 'Предзаказы',
-  defects: 'Брак',
-  stock: 'Остаток',
-}
 
 export function AdminProductsStocksPage() {
   const location = useLocation()
@@ -341,6 +331,7 @@ export function AdminProductsStocksPage() {
   const [stocksAddDialogPinnedRailStyle, setStocksAddDialogPinnedRailStyle] = useState<
     CSSProperties | undefined
   >(undefined)
+  const [adminOrders, setAdminOrders] = useState(() => loadOrdersDraft())
 
   const syncWarehousesDialogPinnedRail = useCallback(() => {
     const el = warehousesDialogPanelRef.current
@@ -390,6 +381,35 @@ export function AdminProductsStocksPage() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    const syncOrders = () => setAdminOrders(loadOrdersDraft())
+    window.addEventListener(ORDERS_UPDATED_EVENT, syncOrders)
+    return () => window.removeEventListener(ORDERS_UPDATED_EVENT, syncOrders)
+  }, [])
+
+  useEffect(() => {
+    if (!isSiteConfigApiExpected()) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const remote = await fetchAdminOrdersFromApi()
+        if (cancelled || remote == null || !Array.isArray(remote.orders)) return
+        saveOrdersDraft(remote.orders)
+        setAdminOrders(remote.orders)
+      } catch {
+        /* localStorage / seed */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const orderMetricsFromAdminMap = useMemo(
+    () => buildOrderMetricsFromAdminOrders(adminOrders, draft.catalog, draft.warehouses),
+    [adminOrders, draft.catalog, draft.warehouses],
+  )
 
   useEffect(() => {
     if (!mounted) return
@@ -663,6 +683,32 @@ export function AdminProductsStocksPage() {
     [draft.defectRecords],
   )
 
+  const mergeOrderMetrics = useCallback(
+    (
+      productId: string,
+      warehouseIds: string[],
+      base: WarehouseStockBreakdown,
+      receipts: number,
+      defects: number,
+    ): WarehouseStockBreakdown => {
+      const primaryId = resolvePrimaryWarehouseId(draft.warehouses)
+      const split =
+        warehouseIds.length === 0 || !primaryId
+          ? { orders: 0, preorders: 0 }
+          : warehouseIds.length === 1 && warehouseIds[0] !== primaryId
+            ? { orders: 0, preorders: 0 }
+            : orderMetricsFromMap(orderMetricsFromAdminMap, productId, primaryId)
+      return withDerivedStock({
+        ...base,
+        receipts,
+        defects,
+        orders: split.orders,
+        preorders: split.preorders,
+      })
+    },
+    [orderMetricsFromAdminMap, draft.warehouses],
+  )
+
   const getRowMetrics = useCallback(
     (stock: StockRow | undefined, productId: string): WarehouseStockBreakdown => {
       const notReady = !allTabWarehouseSelectionInitRef.current && draft.warehouses.length > 0
@@ -674,7 +720,13 @@ export function AdminProductsStocksPage() {
           receipts += receiptUnitsFromSupplies(receiptsFromSuppliesMap, productId, w.id)
           defects += receiptUnitsFromSupplies(defectsFromDefectRecordsMap, productId, w.id)
         }
-        return withDerivedStock({ ...summed, receipts, defects })
+        return mergeOrderMetrics(
+          productId,
+          draft.warehouses.map((w) => w.id),
+          summed,
+          receipts,
+          defects,
+        )
       }
       const ids = allTabIncludedWarehouseIds
       if (ids.length === 0) return emptyWarehouseStock()
@@ -683,7 +735,7 @@ export function AdminProductsStocksPage() {
         const b = getWarehouseStock(stock?.byWarehouse ?? {}, wid)
         const receipts = receiptUnitsFromSupplies(receiptsFromSuppliesMap, productId, wid)
         const defects = receiptUnitsFromSupplies(defectsFromDefectRecordsMap, productId, wid)
-        return withDerivedStock({ ...b, receipts, defects })
+        return mergeOrderMetrics(productId, [wid], b, receipts, defects)
       }
       const included = draft.warehouses.filter((w) => ids.includes(w.id))
       const summed = sumMetricsAcrossWarehouses(stock, included)
@@ -693,13 +745,22 @@ export function AdminProductsStocksPage() {
         receipts += receiptUnitsFromSupplies(receiptsFromSuppliesMap, productId, w.id)
         defects += receiptUnitsFromSupplies(defectsFromDefectRecordsMap, productId, w.id)
       }
-      return withDerivedStock({ ...summed, receipts, defects })
+      return mergeOrderMetrics(
+        productId,
+        included.map((w) => w.id),
+        summed,
+        receipts,
+        defects,
+      )
     },
-    [draft.warehouses, allTabIncludedWarehouseIds, receiptsFromSuppliesMap, defectsFromDefectRecordsMap],
+    [
+      draft.warehouses,
+      allTabIncludedWarehouseIds,
+      receiptsFromSuppliesMap,
+      defectsFromDefectRecordsMap,
+      mergeOrderMetrics,
+    ],
   )
-
-  const stockEditWarehouseId =
-    allTabIncludedWarehouseIds.length === 1 ? allTabIncludedWarehouseIds[0] : ''
 
   const toggleAllTabWarehouse = (warehouseId: string) => {
     setAllTabIncludedWarehouseIds((prev) =>
@@ -738,10 +799,38 @@ export function AdminProductsStocksPage() {
 
   const persistProductsInventory = async () => {
     setApiError(null)
-    saveProductsInventoryDraft(draft)
+    const primaryWh = resolvePrimaryWarehouseId(draft.warehouses)
+    const orderMap = buildOrderMetricsFromAdminOrders(adminOrders, draft.catalog, draft.warehouses)
+    const toSave: ProductsInventoryDraft = {
+      ...draft,
+      stocks: draft.stocks.map((row) => ({
+        productId: row.productId,
+        byWarehouse: Object.fromEntries(
+          draft.warehouses.map((w) => {
+            const receipts = receiptUnitsFromSupplies(receiptsFromSuppliesMap, row.productId, w.id)
+            const defects = receiptUnitsFromSupplies(defectsFromDefectRecordsMap, row.productId, w.id)
+            const split = orderMetricsFromMap(orderMap, row.productId, w.id)
+            const orders = w.id === primaryWh ? split.orders : 0
+            const preorders = w.id === primaryWh ? split.preorders : 0
+            return [
+              w.id,
+              withDerivedStock({
+                ...getWarehouseStock(row.byWarehouse, w.id),
+                receipts,
+                defects,
+                orders,
+                preorders,
+              }),
+            ]
+          }),
+        ),
+      })),
+    }
+    saveProductsInventoryDraft(toSave)
+    setDraft(ensureStockRowsForCatalog(loadProductsInventoryDraft()))
     if (isSiteConfigApiExpected()) {
       try {
-        await putAdminProductsInventoryToApi(draft)
+        await putAdminProductsInventoryToApi(toSave)
       } catch (err) {
         setApiError(err instanceof Error ? err.message : 'Не удалось сохранить в базу.')
         return
@@ -762,40 +851,6 @@ export function AdminProductsStocksPage() {
       setSortKey(key)
       setSortDir('asc')
     }
-  }
-
-  const setMetric = (productId: string, warehouseId: string, field: MetricField, value: number) => {
-    if (field === 'receipts' || field === 'defects' || field === 'stock') return
-    const v = Math.max(0, Math.floor(Number(value) || 0))
-    setDraft((prev) => {
-      const has = prev.stocks.some((s) => s.productId === productId)
-      const patch = (b: WarehouseStockBreakdown): WarehouseStockBreakdown => ({ ...b, [field]: v })
-      const stocks = has
-        ? prev.stocks.map((row) =>
-            row.productId === productId
-              ? {
-                  ...row,
-                  byWarehouse: {
-                    ...row.byWarehouse,
-                    [warehouseId]: patch(getWarehouseStock(row.byWarehouse, warehouseId)),
-                  },
-                }
-              : row,
-          )
-        : [
-            ...prev.stocks,
-            {
-              productId,
-              byWarehouse: Object.fromEntries(
-                prev.warehouses.map((w) => [
-                  w.id,
-                  w.id === warehouseId ? patch(emptyWarehouseStock()) : emptyWarehouseStock(),
-                ]),
-              ),
-            },
-          ]
-      return { ...prev, stocks }
-    })
   }
 
   const addWarehouse = () => {
@@ -1480,19 +1535,18 @@ export function AdminProductsStocksPage() {
                 ) : allTabIncludedWarehouseIds.length === 0 ? (
                   <>
                     Ни один склад не отмечен в панели с шестерёнкой — в таблице нули. Отметьте склады или нажмите «Выбрать
-                    все». Чтобы редактировать числа, отметьте в шестерёнке ровно один склад.
+                    все».
                   </>
                 ) : allTabIncludedWarehouseIds.length === 1 ? (
                   <>
-                    Показаны остатки по одному складу. Поступления и брак — суммы по журналам «Поставки» и «Брак» (не
-                    редактируются); заказ и предзаказы — ввод в ячейках. Остаток считается автоматически: поступления −
-                    заказ − предзаказы − брак. «Сохранить» внизу страницы.
+                    Показаны остатки по одному складу. Поступления — журнал «Поставки», брак — «Брак», заказ и предзаказы —
+                    из раздела «Заказы» (не доставленные; предзаказ — если у товара в каталоге «Под заказ»). Остаток:
+                    поступления − заказ − предзаказы − брак.
                   </>
                 ) : (
                   <>
-                    Поступления и брак — суммы по журналам на выбранных складах; заказ и предзаказы — сумма по выбранным
-                    складам ({allTabIncludedWarehouseIds.length} из {draft.warehouses.length}, только просмотр). Остаток —
-                    по тем же величинам: поступления − заказ − предзаказы − брак. Состав складов — шестерёнка справа.
+                    Поступления и брак — по журналам на выбранных складах; заказ и предзаказы — из «Заказов» (основной склад:
+                    Москва / первый в списке). Состав складов — шестерёнка справа.
                   </>
                 )}
               </p>
@@ -1548,8 +1602,6 @@ export function AdminProductsStocksPage() {
                   const stock = stocksByProduct.get(product.id)
                   const m = getRowMetrics(stock, product.id)
                   const firstImage = product.imageUrls[0] ?? ''
-                  const canEdit = Boolean(stockEditWarehouseId)
-
                   return (
                     <div key={product.id} role="row" className="contents">
                       <div
@@ -1576,26 +1628,10 @@ export function AdminProductsStocksPage() {
                       <div className={`${stocksCellFrameClass} min-w-0 justify-start text-sm text-white`}>
                         <span className="line-clamp-2 text-left text-sm leading-tight">{product.name}</span>
                       </div>
-                      {METRIC_FIELDS.map((field) =>
-                        canEdit && field !== 'receipts' && field !== 'defects' && field !== 'stock' ? (
-                          <div key={field} className={`${stocksCellFrameClass} justify-center`}>
-                            <input
-                              type="number"
-                              min={0}
-                              value={m[field]}
-                              onChange={(e) =>
-                                setMetric(product.id, stockEditWarehouseId, field, Number(e.target.value || 0))
-                              }
-                              className={stocksQtyInputInFrameClass}
-                              aria-label={`${metricFieldLabel[field]} — ${product.name}`}
-                            />
-                          </div>
-                        ) : (
+                      {METRIC_FIELDS.map((field) => (
                           <div
                             key={field}
-                            className={`${stocksCellFrameClass} justify-center text-sm leading-none text-white ${
-                              field === 'receipts' || field === 'defects' || field === 'stock' ? 'tabular-nums' : ''
-                            }`}
+                            className={`${stocksCellFrameClass} justify-center text-sm leading-none tabular-nums text-white`}
                             aria-label={
                               field === 'receipts'
                                 ? `Поступления (сумма по поставкам) — ${product.name}`
@@ -1608,8 +1644,7 @@ export function AdminProductsStocksPage() {
                           >
                             {m[field]}
                           </div>
-                        ),
-                      )}
+                      ))}
                     </div>
                   )
                 })}

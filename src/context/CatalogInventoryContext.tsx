@@ -11,7 +11,7 @@ import { fetchAdminProductsInventoryFromApi } from '../api/adminDataApi'
 import { fetchDevSyncInventory } from '../lib/devCatalogSync'
 import { fetchAllStoreReviews } from '../api/reviewsApi'
 import { isSiteConfigApiExpected } from '../constants/apiBase'
-import type { ProductCatalogRow } from '../admin/types/siteSettings'
+import type { ProductCatalogRow, StockRow, Warehouse } from '../admin/types/siteSettings'
 import {
   META_BY_ID as staticMetaById,
   products as staticProducts,
@@ -47,20 +47,24 @@ const CatalogInventoryContext = createContext<CatalogInventoryContextValue | nul
 
 export function CatalogInventoryProvider({ children }: { children: ReactNode }) {
   const apiExpected = isSiteConfigApiExpected()
-  const [apiRows, setApiRows] = useState<ProductCatalogRow[] | null>(null)
+  const [apiInventory, setApiInventory] = useState<{
+    catalog: ProductCatalogRow[]
+    stocks: StockRow[]
+    warehouses: Warehouse[]
+  } | null>(null)
   const [source, setSource] = useState<CatalogSource>(apiExpected ? 'api' : 'static')
   const [hydrated, setHydrated] = useState(!apiExpected)
   const [reviewStatsByProductId, setReviewStatsByProductId] = useState<
     Record<string, ProductReviewStats>
   >({})
   const applyStatic = useCallback(() => {
-    setApiRows(null)
+    setApiInventory(null)
     setSource('static')
   }, [])
 
   /** На проде без снимка в БД — пустой каталог, не демо из `catalogProducts.ts`. */
   const applyEmptyApi = useCallback(() => {
-    setApiRows([])
+    setApiInventory({ catalog: [], stocks: [], warehouses: [] })
     setSource('api')
   }, [])
 
@@ -69,7 +73,11 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
     const sync = await fetchDevSyncInventory()
     if (sync?.catalog?.length) {
       setSource('api')
-      setApiRows(sync.catalog)
+      setApiInventory({
+        catalog: sync.catalog,
+        stocks: sync.stocks ?? [],
+        warehouses: sync.warehouses ?? [],
+      })
       return true
     }
     return false
@@ -85,7 +93,11 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
       const draft = await fetchAdminProductsInventoryFromApi()
       if (draft != null && Array.isArray(draft.catalog) && draft.catalog.length > 0) {
         setSource('api')
-        setApiRows(draft.catalog)
+        setApiInventory({
+          catalog: draft.catalog,
+          stocks: draft.stocks ?? [],
+          warehouses: draft.warehouses ?? [],
+        })
         return
       }
       if (await applyDevSyncFallback()) return
@@ -142,14 +154,17 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
     if (apiExpected && !hydrated) {
       return { products: [] as Product[], metaById: {} as Record<string, ProductMeta> }
     }
-    if (source === 'api' && apiRows !== null) {
-      return mapCatalogRowsToStorefront(apiRows)
+    if (source === 'api' && apiInventory !== null) {
+      return mapCatalogRowsToStorefront(apiInventory.catalog, {
+        stocks: apiInventory.stocks,
+        warehouses: apiInventory.warehouses,
+      })
     }
     if (source === 'static') {
       return { products: staticProducts, metaById: staticMetaById }
     }
     return { products: [] as Product[], metaById: {} as Record<string, ProductMeta> }
-  }, [apiExpected, hydrated, source, apiRows])
+  }, [apiExpected, hydrated, source, apiInventory])
 
   const products = useMemo(
     () => applyReviewStatsToProducts(baseProducts, reviewStatsByProductId),

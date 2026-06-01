@@ -38,6 +38,33 @@ export function getWarehouseStock(
   return raw ? normalizeWarehouseStockValue(raw) : emptyWarehouseStock()
 }
 
+/** Остаток: поступления − заказ − предзаказы − брак. */
+export function deriveStockFromBreakdown(b: WarehouseStockBreakdown): number {
+  const r = Math.max(0, Math.floor(Number(b.receipts) || 0))
+  const o = Math.max(0, Math.floor(Number(b.orders) || 0))
+  const pr = Math.max(0, Math.floor(Number(b.preorders) || 0))
+  const d = Math.max(0, Math.floor(Number(b.defects) || 0))
+  return r - o - pr - d
+}
+
+export function withDerivedStock(row: WarehouseStockBreakdown): WarehouseStockBreakdown {
+  return { ...row, stock: deriveStockFromBreakdown(row) }
+}
+
+/** Сумма остатков по всем складам для витрины и отчётов. */
+export function getTotalStockUnitsForProduct(
+  stocks: StockRow[],
+  warehouses: Warehouse[],
+  productId: string,
+): number {
+  const row = stocks.find((s) => s.productId === productId)
+  if (!row || warehouses.length === 0) return 0
+  return warehouses.reduce((sum, w) => {
+    const b = getWarehouseStock(row.byWarehouse, w.id)
+    return sum + deriveStockFromBreakdown(b)
+  }, 0)
+}
+
 export function sumMetricsAcrossWarehouses(
   stockRow: StockRow | undefined,
   warehouses: Warehouse[],

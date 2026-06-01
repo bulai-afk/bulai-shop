@@ -253,6 +253,7 @@ function DictionaryDropdown({
   onChange: (value: string) => void
   ariaLabel: string
 }) {
+  const singleSelect = dictionary.id === 'availability'
   const options = dictionary.values
     .map((item) => ({
       label: item.value,
@@ -263,7 +264,13 @@ function DictionaryDropdown({
   const selectedKeys = decodeMultiValue(value)
   const selected = options.filter((item) => selectedKeys.includes(item.key))
 
-  const toggleOption = (key: string) => {
+  const toggleOption = (key: string, closeTarget?: EventTarget | null) => {
+    if (singleSelect) {
+      const next = selectedKeys.includes(key) ? [] : [key]
+      onChange(encodeMultiValue(next))
+      if (closeTarget) closeDropdownFromChild(closeTarget)
+      return
+    }
     const next = selectedKeys.includes(key)
       ? selectedKeys.filter((item) => item !== key)
       : [...selectedKeys, key]
@@ -309,7 +316,7 @@ function DictionaryDropdown({
           <button
             key={`${dictionary.id}-${item.label}`}
             type="button"
-            onClick={() => toggleOption(item.key)}
+            onClick={(e) => toggleOption(item.key, e.currentTarget)}
             className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-200 transition hover:bg-white/10"
           >
             <span
@@ -673,7 +680,8 @@ export function AdminProductsCatalogPage() {
           }
           if (dictionaryId === 'color') return { ...row, color: encodeMultiValue(values) }
           if (dictionaryId === 'availability') {
-            return { ...row, availability: normalizeAvailability(values[0] ?? '') }
+            const picked = values.length > 0 ? values[values.length - 1]! : ''
+            return { ...row, availability: normalizeAvailability(picked) }
           }
           return { ...row, attributes: { ...row.attributes, [dictionaryId]: encodeMultiValue(values) } }
         }),

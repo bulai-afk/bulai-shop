@@ -1,4 +1,5 @@
-import type { ProductCatalogRow } from '../admin/types/siteSettings'
+import type { ProductCatalogRow, StockRow, Warehouse } from '../admin/types/siteSettings'
+import { getTotalStockUnitsForProduct } from '../admin/lib/stockRowUtils'
 import type { ColorSwatch, Product, ProductAccordionSections, ProductCategory, ProductMeta } from '../data/catalogProducts'
 import { formatBelarusRubAmount } from '../lib/formatMoney'
 
@@ -82,7 +83,19 @@ function normalizeSeason(raw: string): ProductMeta['season'] {
   return 'деми'
 }
 
-function metaFromRow(row: ProductCatalogRow, index: number): ProductMeta {
+export type StorefrontInventoryStock = {
+  stocks: StockRow[]
+  warehouses: Warehouse[]
+}
+
+/** Бейдж «В наличии» на витрине: остаток > 0 и статус не «нет» / не предзаказ. */
+export function resolveStorefrontInStock(row: ProductCatalogRow, stockUnits: number): boolean {
+  if (row.availability === 'out_of_stock') return false
+  if (row.availability === 'preorder') return false
+  return stockUnits > 0
+}
+
+function metaFromRow(row: ProductCatalogRow, index: number, stockUnits: number): ProductMeta {
   const a = row.attributes ?? {}
   const cat = typeof a.category === 'string' ? a.category : ''
   const fit = typeof a.fit === 'string' ? a.fit : ''
@@ -94,7 +107,7 @@ function metaFromRow(row: ProductCatalogRow, index: number): ProductMeta {
     fit: normalizeFit(fit),
     material: normalizeMaterial(material),
     season: normalizeSeason(season),
-    inStock: row.availability === 'in_stock',
+    inStock: resolveStorefrontInStock(row, stockUnits),
   }
 }
 
@@ -111,15 +124,21 @@ function accordionFromRow(row: ProductCatalogRow): ProductAccordionSections | un
   }
 }
 
-export function mapCatalogRowsToStorefront(rows: ProductCatalogRow[]): {
+export function mapCatalogRowsToStorefront(
+  rows: ProductCatalogRow[],
+  inventoryStock?: StorefrontInventoryStock,
+): {
   products: Product[]
   metaById: Record<string, ProductMeta>
 } {
   const products: Product[] = []
   const metaById: Record<string, ProductMeta> = {}
+  const stocks = inventoryStock?.stocks ?? []
+  const warehouses = inventoryStock?.warehouses ?? []
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
+    const stockUnits = getTotalStockUnitsForProduct(stocks, warehouses, row.id)
     const mainImage = row.imageUrls[0]?.trim() || PLACEHOLDER_IMAGE
     const colorNames = decodeMultiValue(row.color)
     const sizeList = decodeMultiValue(row.size)
@@ -158,7 +177,7 @@ export function mapCatalogRowsToStorefront(rows: ProductCatalogRow[]): {
       colors,
       accordionSections,
     })
-    metaById[row.id] = metaFromRow(row, i)
+    metaById[row.id] = metaFromRow(row, i, stockUnits)
   }
 
   return { products, metaById }
