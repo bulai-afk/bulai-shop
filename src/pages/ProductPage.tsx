@@ -90,6 +90,7 @@ export function ProductPage() {
   const [relatedColorByProduct, setRelatedColorByProduct] = useState<Record<string, string>>({})
 
   const gallery = useMemo(() => (product ? buildGallery(product) : []), [product])
+  const showGalleryThumbnails = gallery.length > 1
 
   const accordionFeatures = useMemo(() => {
     if (!product || !meta) {
@@ -224,32 +225,34 @@ export function ProductPage() {
               const c = product.colors[index]
               if (c) setSelectedColorName(c.name)
             }}
-            className="flex flex-col-reverse gap-4"
+            className={showGalleryThumbnails ? 'flex flex-col-reverse gap-4' : undefined}
           >
-            <div className="mx-auto w-full max-w-2xl lg:max-w-none">
-              <TabList className="flex gap-4">
-                {gallery.map((item) => (
-                  <Tab
-                    key={item.label + item.image}
-                    className="relative flex min-w-0 flex-1 cursor-pointer items-center justify-center rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
-                  >
-                    {({ selected }) => (
-                      <>
-                        <span className="sr-only">{item.label}</span>
-                        <span
-                          className={classNames(
-                            'pointer-events-none inline-block h-24 w-full overflow-hidden rounded-md border-2 border-transparent sm:h-32',
-                            selected ? 'border-indigo-500' : 'border-white/10',
-                          )}
-                        >
-                          <img src={item.image} alt="" className="h-full w-full object-cover object-center" />
-                        </span>
-                      </>
-                    )}
-                  </Tab>
-                ))}
-              </TabList>
-            </div>
+            {showGalleryThumbnails ? (
+              <div className="mx-auto w-full max-w-2xl lg:max-w-none">
+                <TabList className="flex gap-4">
+                  {gallery.map((item) => (
+                    <Tab
+                      key={item.label + item.image}
+                      className="relative flex min-w-0 flex-1 cursor-pointer items-center justify-center rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+                    >
+                      {({ selected }) => (
+                        <>
+                          <span className="sr-only">{item.label}</span>
+                          <span
+                            className={classNames(
+                              'pointer-events-none inline-block h-24 w-full overflow-hidden rounded-md border-2 border-transparent sm:h-32',
+                              selected ? 'border-indigo-500' : 'border-white/10',
+                            )}
+                          >
+                            <img src={item.image} alt="" className="h-full w-full object-cover object-center" />
+                          </span>
+                        </>
+                      )}
+                    </Tab>
+                  ))}
+                </TabList>
+              </div>
+            ) : null}
 
             <div className="relative">
               <p
