@@ -15,17 +15,10 @@ const PAGE_SCROLL_BOTTOM_SLACK_PX = 4
 
 type Props = {
   productId: string
-  productRating: number
-  reviewCount: number
   productPreview?: WriteReviewProductPreview | null
 }
 
-export function ProductGalleryReviews({
-  productId,
-  productRating,
-  reviewCount,
-  productPreview,
-}: Props) {
+export function ProductGalleryReviews({ productId, productPreview }: Props) {
   const headingId = useId().replace(/:/g, '')
   const [reviewStarsFilter, setReviewStarsFilter] = useState<number | null>(null)
   const reviewsSidebarRef = useRef<HTMLDivElement>(null)
@@ -35,12 +28,20 @@ export function ProductGalleryReviews({
   const [writeReviewOpen, setWriteReviewOpen] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const { isAuthenticated, openAuthDialog } = useAuth()
-  const { reviews: recentReviews, productRating: apiRating, reviewCount: apiCount, reload } =
-    useProductReviews(productId)
+  const {
+    reviews: recentReviews,
+    productRating: apiRating,
+    reviewCount: apiCount,
+    loading: reviewsLoading,
+    reload,
+  } = useProductReviews(productId)
 
-  const displayRating = apiRating ?? productRating
-  const displayCount = apiCount ?? reviewCount
+  const displayCount = reviewsLoading
+    ? 0
+    : Math.max(apiCount ?? 0, recentReviews.length)
+  const displayRating = displayCount > 0 ? (apiRating ?? 0) : 0
   const total = recentReviews.length
+  const hasReviews = !reviewsLoading && displayCount > 0
 
   const countByStar = recentReviews.reduce<Record<number, number>>((acc, r) => {
     acc[r.rating] = (acc[r.rating] ?? 0) + 1
@@ -131,53 +132,59 @@ export function ProductGalleryReviews({
                 Отзывы о товаре
               </h2>
 
-              <div className="mt-3 flex flex-wrap items-center gap-y-1">
-                <div>
-                  <div
-                    className="flex items-center"
-                    aria-label={`Рейтинг ${displayRating.toFixed(1)} из 5`}
-                  >
-                    {[1, 2, 3, 4, 5].map((star) => {
-                      const isFull = roundedSummary >= star
-                      const isHalf = !isFull && roundedSummary + 0.5 === star
+              {hasReviews ? (
+                <>
+                  <div className="mt-3 flex flex-wrap items-center gap-y-1">
+                    <div>
+                      <div
+                        className="flex items-center"
+                        aria-label={`Рейтинг ${displayRating.toFixed(1)} из 5`}
+                      >
+                        {[1, 2, 3, 4, 5].map((star) => {
+                          const isFull = roundedSummary >= star
+                          const isHalf = !isFull && roundedSummary + 0.5 === star
 
-                      if (isFull) {
-                        return (
-                          <span key={star} aria-hidden className="text-amber-300">
-                            ★
-                          </span>
-                        )
-                      }
-                      if (isHalf) {
-                        return (
-                          <span key={star} aria-hidden className="relative inline-block text-gray-600">
-                            ★
-                            <span className="absolute inset-y-0 left-0 w-1/2 overflow-hidden text-amber-300">
+                          if (isFull) {
+                            return (
+                              <span key={star} aria-hidden className="text-amber-300">
+                                ★
+                              </span>
+                            )
+                          }
+                          if (isHalf) {
+                            return (
+                              <span
+                                key={star}
+                                aria-hidden
+                                className="relative inline-block text-gray-600"
+                              >
+                                ★
+                                <span className="absolute inset-y-0 left-0 w-1/2 overflow-hidden text-amber-300">
+                                  ★
+                                </span>
+                              </span>
+                            )
+                          }
+                          return (
+                            <span key={star} aria-hidden className="text-gray-600">
                               ★
                             </span>
-                          </span>
-                        )
-                      }
-                      return (
-                        <span key={star} aria-hidden className="text-gray-600">
-                          ★
-                        </span>
-                      )
-                    })}
+                          )
+                        })}
+                      </div>
+                      <p className="sr-only">{displayRating.toFixed(1)} из 5</p>
+                    </div>
+                    <p className="ml-3 text-sm font-semibold text-white">{displayRating.toFixed(1)}</p>
+                    <p className="ml-4 text-sm text-white">
+                      На основе {displayCount.toLocaleString('ru-RU')} отзывов
+                    </p>
                   </div>
-                  <p className="sr-only">{displayRating.toFixed(1)} из 5</p>
-                </div>
-                <p className="ml-3 text-sm font-semibold text-white">{displayRating.toFixed(1)}</p>
-                <p className="ml-4 text-sm text-white">
-                  На основе {displayCount.toLocaleString('ru-RU')} отзывов
-                </p>
-              </div>
 
-              <div className="mt-6">
-                <h3 className="sr-only">Распределение оценок</h3>
+                  <div className="mt-6">
+                    <h3 className="sr-only">Распределение оценок</h3>
 
-                <dl className="space-y-3">
-                  {breakdown.map((row) => {
+                    <dl className="space-y-3">
+                      {breakdown.map((row) => {
                     const percent = pct(row.count)
                     const active = reviewStarsFilter === row.stars
                     return (
@@ -228,18 +235,22 @@ export function ProductGalleryReviews({
                   })}
                 </dl>
 
-                {reviewStarsFilter !== null ? (
-                  <div className="mt-3 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setReviewStarsFilter(null)}
-                      className="text-sm font-semibold text-indigo-300 hover:text-indigo-200"
-                    >
-                      Сбросить фильтр
-                    </button>
+                    {reviewStarsFilter !== null ? (
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setReviewStarsFilter(null)}
+                          className="text-sm font-semibold text-indigo-300 hover:text-indigo-200"
+                        >
+                          Сбросить фильтр
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-gray-400">Пока нет отзывов об этом товаре.</p>
+              )}
 
               <div className="mt-10">
                 <h3 className="text-base font-semibold text-white">Поделитесь мнением</h3>

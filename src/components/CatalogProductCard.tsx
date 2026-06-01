@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { CatalogPriceLabel } from './CatalogPriceLabel'
+import { MoneyAmount } from './MoneyAmount'
 import type { Product, ProductMeta } from '../data/catalogProducts'
 
 export type CatalogProductCardProps = {
@@ -103,8 +104,12 @@ export function CatalogProductCard({
               }`}
             >
               <CatalogPriceLabel
-                price={product.price}
-                oldPrice={product.oldPrice}
+                price={<MoneyAmount amount={product.price} />}
+                oldPrice={
+                  product.oldPrice ? (
+                    <MoneyAmount amount={product.oldPrice} symbolClassName="h-[0.78em] w-[0.5em]" />
+                  ) : undefined
+                }
                 discount={product.discount}
               />
             </div>
@@ -132,13 +137,19 @@ export function CatalogProductCard({
         <TitleTag className="text-base font-semibold text-gray-100">{product.name}</TitleTag>
 
         <div className="mt-2">
-          <div className="flex items-center justify-center gap-2">
-            <div className="flex items-center gap-0.5" aria-label={`Рейтинг ${product.rating} из 5`}>
-              <StarRow rating={product.rating} />
-            </div>
-            <span className="text-sm font-medium text-gray-200">{product.rating.toFixed(1)}</span>
-          </div>
-          <p className="mt-1 text-sm text-gray-500">Оценок: {product.reviews}</p>
+          {product.reviews > 0 && product.rating > 0 ? (
+            <>
+              <div className="flex items-center justify-center gap-2">
+                <div className="flex items-center gap-0.5" aria-label={`Рейтинг ${product.rating} из 5`}>
+                  <StarRow rating={product.rating} />
+                </div>
+                <span className="text-sm font-medium text-gray-200">{product.rating.toFixed(1)}</span>
+              </div>
+              <p className="mt-1 text-sm text-gray-500">Оценок: {product.reviews}</p>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">Пока нет оценок</p>
+          )}
         </div>
 
         <Link

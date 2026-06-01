@@ -1,5 +1,6 @@
 import type { ProductCatalogRow } from '../admin/types/siteSettings'
 import type { ColorSwatch, Product, ProductAccordionSections, ProductCategory, ProductMeta } from '../data/catalogProducts'
+import { formatBelarusRubAmount } from '../lib/formatMoney'
 
 const PLACEHOLDER_IMAGE =
   'data:image/svg+xml,' +
@@ -12,10 +13,6 @@ function decodeMultiValue(value: string): string[] {
     .split('||')
     .map((part) => part.trim())
     .filter(Boolean)
-}
-
-function formatRub(amount: number): string {
-  return `${new Intl.NumberFormat('ru-RU').format(Math.max(0, Math.round(amount)))} ₽`
 }
 
 function todayIsoLocal(): string {
@@ -141,8 +138,9 @@ export function mapCatalogRowsToStorefront(rows: ProductCatalogRow[]): {
     const activeDiscount = pct > 0 && isDiscountInPeriod(row)
     const listPrice = Math.max(0, row.price)
     const salePrice = activeDiscount ? Math.round(listPrice * (1 - pct / 100)) : listPrice
-    const priceStr = formatRub(salePrice)
-    const oldPriceStr = activeDiscount && salePrice < listPrice ? formatRub(listPrice) : undefined
+    const priceStr = formatBelarusRubAmount(salePrice)
+    const oldPriceStr =
+      activeDiscount && salePrice < listPrice ? formatBelarusRubAmount(listPrice) : undefined
     const discountStr = activeDiscount ? `-${pct}%` : undefined
 
     const accordionSections = accordionFromRow(row)
@@ -154,8 +152,8 @@ export function mapCatalogRowsToStorefront(rows: ProductCatalogRow[]): {
       oldPrice: oldPriceStr,
       discount: discountStr,
       image: mainImage,
-      rating: Math.max(3.8, Math.min(5, 4.5 + (i % 7) * 0.07)),
-      reviews: 12 + (i % 50) * 2,
+      rating: 0,
+      reviews: 0,
       sizes,
       colors,
       accordionSections,

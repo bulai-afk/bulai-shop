@@ -1,0 +1,237 @@
+{
+  "stocks": [
+    {
+      "productId": "hoodie-oversize",
+      "byWarehouse": {
+        "minsk": {
+          "stock": 4,
+          "orders": 1,
+          "defects": 1,
+          "receipts": 6,
+          "preorders": 0
+        },
+        "spb-2": {
+          "stock": 7,
+          "orders": 3,
+          "defects": 1,
+          "receipts": 12,
+          "preorders": 1
+        },
+        "msk-main": {
+          "stock": 18,
+          "orders": 7,
+          "defects": 1,
+          "receipts": 24,
+          "preorders": 2
+        }
+      }
+    },
+    {
+      "productId": "tee-basic",
+      "byWarehouse": {
+        "minsk": {
+          "stock": 9,
+          "orders": 2,
+          "defects": 1,
+          "receipts": 12,
+          "preorders": 0
+        },
+        "spb-2": {
+          "stock": 12,
+          "orders": 4,
+          "defects": 1,
+          "receipts": 18,
+          "preorders": 1
+        },
+        "msk-main": {
+          "stock": 35,
+          "orders": 12,
+          "defects": 2,
+          "receipts": 50,
+          "preorders": 4
+        }
+      }
+    },
+    {
+      "productId": "shirt-relaxed",
+      "byWarehouse": {
+        "minsk": {
+          "stock": 2,
+          "orders": 1,
+          "defects": 1,
+          "receipts": 4,
+          "preorders": 0
+        },
+        "spb-2": {
+          "stock": 0,
+          "orders": 1,
+          "defects": 1,
+          "receipts": 2,
+          "preorders": 0
+        },
+        "msk-main": {
+          "stock": 5,
+          "orders": 2,
+          "defects": 1,
+          "receipts": 8,
+          "preorders": 0
+        }
+      }
+    }
+  ],
+  "catalog": [
+    {
+      "id": "hoodie-oversize",
+      "sku": "241-001",
+      "name": "Худи оверсайз",
+      "size": "L",
+      "color": "Черный",
+      "price": 54,
+      "imageUrls": [
+        "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600&q=80"
+      ],
+      "attributes": {
+        "fit": "Oversize",
+        "season": "Осень",
+        "category": "Худи",
+        "material": "Хлопок"
+      },
+      "description": "Тёплое худи с мягким внутренним слоем. Универсальный крой и аккуратные швы — удобно носить каждый день.",
+      "availability": "in_stock",
+      "discountPercent": 0,
+      "discountValidTo": "",
+      "discountValidFrom": "",
+      "recommendedProductIds": [
+        "tee-basic"
+      ]
+    },
+    {
+      "id": "tee-basic",
+      "sku": "132-001",
+      "name": "Футболка базовая",
+      "size": "M",
+      "color": "Белый",
+      "price": 35,
+      "imageUrls": [
+        "https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=600&q=80"
+      ],
+      "attributes": {
+        "fit": "Regular",
+        "season": "Лето",
+        "category": "Футболки",
+        "material": "Хлопок"
+      },
+      "description": "Базовая футболка из плотного хлопка. Нейтральный силуэт, подходит под любой низ.",
+      "availability": "in_stock",
+      "discountPercent": 0,
+      "discountValidTo": "",
+      "discountValidFrom": "",
+      "recommendedProductIds": [
+        "hoodie-oversize"
+      ]
+    },
+    {
+      "id": "shirt-relaxed",
+      "sku": "350-001",
+      "name": "Рубашка relaxed",
+      "size": "XL",
+      "color": "Олива",
+      "price": 30,
+      "imageUrls": [
+        "https://images.unsplash.com/photo-1603252109303-2751441dd157?auto=format&fit=crop&w=600&q=80"
+      ],
+      "attributes": {
+        "fit": "Relaxed",
+        "season": "Весна",
+        "category": "Рубашки",
+        "material": "Лен"
+      },
+      "description": "Рубашка в расслабленной посадке из лёгкого льна. Хорошо смотрится и с брюками, и с шортами.",
+      "availability": "preorder",
+      "discountPercent": 0,
+      "discountValidTo": "",
+      "discountValidFrom": "",
+      "recommendedProductIds": []
+    }
+  ],
+  "supplies": [
+    {
+      "id": "sup-demo-1",
+      "date": "2026-01-18",
+      "note": "",
+      "lines": [
+        {
+          "quantity": 12,
+          "productId": "hoodie-oversize"
+        },
+        {
+          "quantity": 30,
+          "productId": "tee-basic"
+        }
+      ],
+      "rating": 5,
+      "supplierId": "sup-msk-main",
+      "warehouseId": "msk-main",
+      "documentNumber": "УПД-1042"
+    },
+    {
+      "id": "sup-demo-2",
+      "date": "2026-02-02",
+      "note": "Частичная отгрузка",
+      "lines": [
+        {
+          "quantity": 6,
+          "productId": "shirt-relaxed"
+        }
+      ],
+      "rating": 4,
+      "supplierId": "sup-spb-2",
+      "warehouseId": "spb-2",
+      "documentNumber": "Счёт 88"
+    }
+  ],
+  "suppliers": [
+    {
+      "id": "sup-msk-main",
+      "name": "ООО «Пошив хоум»",
+      "rating": 5,
+      "requisites": "ИНН 7701001001, КПП 770101001, р/с 40702810…",
+      "defectCount": 0,
+      "supplyCount": 1
+    },
+    {
+      "id": "sup-spb-2",
+      "name": "ИП Иванов А.С.",
+      "rating": 4,
+      "requisites": "ИНН 7802002002, р/с 40802810…",
+      "defectCount": 0,
+      "supplyCount": 1
+    },
+    {
+      "id": "sup-minsk",
+      "name": "ООО «БелСнаб»",
+      "rating": 3,
+      "requisites": "УНП 123456789, ОАО «Банк»",
+      "defectCount": 0,
+      "supplyCount": 0
+    }
+  ],
+  "warehouses": [
+    {
+      "id": "msk-main",
+      "name": "Москва, основной",
+      "address": "ул. Складская, 1"
+    },
+    {
+      "id": "spb-2",
+      "name": "Санкт-Петербург",
+      "address": "пр. Логистический, 12"
+    },
+    {
+      "id": "minsk",
+      "name": "Минск",
+      "address": "ул. Промышленная, 5"
+    }
+  ],
+  "defectRecords": []
+}

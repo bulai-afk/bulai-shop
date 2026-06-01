@@ -39,9 +39,41 @@ function yandexOAuthCallbackRoute(): Plugin {
   }
 }
 
+/** В dev отдаёт `data/sync/*.json`, если API не запущен или БД пустая. */
+function devSyncCatalogData(): Plugin {
+  const allowed = new Set(['products-inventory.json', 'products-dictionaries.json'])
+  return {
+    name: 'dev-sync-catalog-data',
+    configureServer(server) {
+      const syncDir = path.join(server.config.root, 'data', 'sync')
+      server.middlewares.use((req, res, next) => {
+        const pathname = (req.url ?? '').split('?')[0] ?? ''
+        if (!pathname.startsWith('/__dev_sync__/')) {
+          next()
+          return
+        }
+        const name = pathname.slice('/__dev_sync__/'.length)
+        if (!allowed.has(name)) {
+          res.statusCode = 404
+          res.end()
+          return
+        }
+        const file = path.join(syncDir, name)
+        if (!fs.existsSync(file)) {
+          res.statusCode = 404
+          res.end('not found — run scripts/pull-products-from-server.sh')
+          return
+        }
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(fs.readFileSync(file))
+      })
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), yandexOAuthCallbackRoute()],
+  plugins: [react(), tailwindcss(), yandexOAuthCallbackRoute(), devSyncCatalogData()],
   server: {
     proxy: {
       // Обход CORS при запросе профиля из браузера в dev (см. src/api/yandexLoginInfo.ts)

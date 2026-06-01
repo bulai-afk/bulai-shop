@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { fetchAdminProductsDictionariesFromApi } from '../api/adminDataApi'
+import { fetchDevSyncDictionaries } from '../lib/devCatalogSync'
 import { isSiteConfigApiExpected } from '../constants/apiBase'
 import type { ProductsDictionariesDraft } from '../admin/types/siteSettings'
 
@@ -38,8 +39,26 @@ export function CatalogDictionariesProvider({ children }: { children: ReactNode 
     }
     try {
       const remote = await fetchAdminProductsDictionariesFromApi()
+      if (remote?.dictionaries?.length) {
+        setDraft(remote)
+        return
+      }
+      if (import.meta.env.DEV) {
+        const sync = await fetchDevSyncDictionaries()
+        if (sync?.dictionaries?.length) {
+          setDraft(sync)
+          return
+        }
+      }
       setDraft(remote ?? EMPTY_PRODUCTS_DICTIONARIES)
     } catch {
+      if (import.meta.env.DEV) {
+        const sync = await fetchDevSyncDictionaries()
+        if (sync?.dictionaries?.length) {
+          setDraft(sync)
+          return
+        }
+      }
       setDraft(EMPTY_PRODUCTS_DICTIONARIES)
     } finally {
       setHydrated(true)

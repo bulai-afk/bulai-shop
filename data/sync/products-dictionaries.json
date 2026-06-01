@@ -1,0 +1,226 @@
+{
+  "dictionaries": [
+    {
+      "id": "category",
+      "name": "Категория",
+      "values": [
+        {
+          "id": "category-1",
+          "color": "",
+          "value": "Футболки",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "category-2",
+          "color": "",
+          "value": "Худи",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "category-3",
+          "color": "",
+          "value": "Рубашки",
+          "imageUrl": "",
+          "catalogSlug": ""
+        }
+      ]
+    },
+    {
+      "id": "size",
+      "name": "Размер",
+      "values": [
+        {
+          "id": "size-1",
+          "color": "",
+          "value": "XS",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "size-2",
+          "color": "",
+          "value": "S",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "size-3",
+          "color": "",
+          "value": "M",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "size-4",
+          "color": "",
+          "value": "L",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "size-5",
+          "color": "",
+          "value": "XL",
+          "imageUrl": "",
+          "catalogSlug": ""
+        }
+      ]
+    },
+    {
+      "id": "color",
+      "name": "Цвет",
+      "values": [
+        {
+          "id": "color-1",
+          "color": "",
+          "value": "Черный",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "color-2",
+          "color": "",
+          "value": "Белый",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "color-3",
+          "color": "",
+          "value": "Серый",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "color-4",
+          "color": "",
+          "value": "Синий",
+          "imageUrl": "",
+          "catalogSlug": ""
+        }
+      ]
+    },
+    {
+      "id": "fit",
+      "name": "Посадка",
+      "values": [
+        {
+          "id": "fit-1",
+          "color": "",
+          "value": "Slim",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "fit-2",
+          "color": "",
+          "value": "Regular",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "fit-3",
+          "color": "",
+          "value": "Oversize",
+          "imageUrl": "",
+          "catalogSlug": ""
+        }
+      ]
+    },
+    {
+      "id": "material",
+      "name": "Материал",
+      "values": [
+        {
+          "id": "material-1",
+          "color": "",
+          "value": "Хлопок",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "material-2",
+          "color": "",
+          "value": "Лен",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "material-3",
+          "color": "",
+          "value": "Вискоза",
+          "imageUrl": "",
+          "catalogSlug": ""
+        }
+      ]
+    },
+    {
+      "id": "season",
+      "name": "Сезон",
+      "values": [
+        {
+          "id": "season-1",
+          "color": "",
+          "value": "Весна",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "season-2",
+          "color": "",
+          "value": "Лето",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "season-3",
+          "color": "",
+          "value": "Осень",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "season-4",
+          "color": "",
+          "value": "Зима",
+          "imageUrl": "",
+          "catalogSlug": ""
+        }
+      ]
+    },
+    {
+      "id": "availability",
+      "name": "Наличие",
+      "values": [
+        {
+          "id": "availability-1",
+          "color": "",
+          "value": "В наличии",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "availability-2",
+          "color": "",
+          "value": "Нет в наличии",
+          "imageUrl": "",
+          "catalogSlug": ""
+        },
+        {
+          "id": "availability-3",
+          "color": "",
+          "value": "Предзаказ",
+          "imageUrl": "",
+          "catalogSlug": ""
+        }
+      ]
+    }
+  ],
+  "skuSourceDictionaryIds": [
+    "category",
+    "size",
+    "color"
+  ]
+}

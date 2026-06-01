@@ -7,6 +7,7 @@ import { promoMaterialsRouter } from './promoMaterials.js'
 import { authSessionRouter } from './authSession.js'
 import { siteConfigRouter } from './siteConfig.js'
 import { storefrontClientProfileRouter } from './storefrontClientProfile.js'
+import { exchangeRatesRouter } from './exchangeRates.js'
 import { productReviewsRouter, reviewsRouter } from './reviews.js'
 
 export const apiRouter = Router()
@@ -16,6 +17,7 @@ apiRouter.use((_req, res, next) => {
   next()
 })
 
+apiRouter.use('/exchange-rates', exchangeRatesRouter)
 apiRouter.use('/site-config', siteConfigRouter)
 apiRouter.use('/promo-materials', promoMaterialsRouter)
 apiRouter.use('/promo-codes', promoCodesCatalogRouter)

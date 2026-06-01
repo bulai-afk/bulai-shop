@@ -168,8 +168,9 @@ export type ProductCatalogRow = {
   recommendedProductIds: string[]
   size: string
   color: string
+  /** Базовая цена в белорусских рублях (BYN), без скидки. */
   price: number
-  /** Скидка в процентах, 0–100. Цена на витрине может считаться от `price`. */
+  /** Скидка в процентах, 0–100. Цена на витрине считается от `price` (BYN). */
   discountPercent: number
   /** Начало действия скидки, `YYYY-MM-DD`. Пусто — без ограничения снизу. */
   discountValidFrom: string

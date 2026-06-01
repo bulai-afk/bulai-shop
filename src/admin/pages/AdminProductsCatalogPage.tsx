@@ -20,6 +20,7 @@ import {
   putAdminProductsInventoryToApi,
 } from '../../api/adminDataApi'
 import { isSiteConfigApiExpected } from '../../constants/apiBase'
+import { BelarusRubleSign } from '../../components/BelarusRubleSign'
 import { PanelScrollArea } from '../../components/PanelScrollArea'
 import { ProfileSaveToast } from '../../components/ProfileSaveToast'
 import { profileDialogPinnedScrollbarRailClass } from '../../components/scrollbarShared'
@@ -36,6 +37,7 @@ import type {
   ProductsDictionariesDraft,
   ProductsInventoryDraft,
 } from '../types/siteSettings'
+import { adminPriceFieldLabel } from '../../lib/formatMoney'
 import { getPageScrollElement } from '../../utils/getPageScrollElement'
 
 const inputClass =
@@ -713,7 +715,7 @@ export function AdminProductsCatalogPage() {
     { id: 'sku', label: 'SKU', width: '8rem' },
     { id: 'imageUrls', label: 'Фото', width: '4rem' },
     { id: 'name', label: 'Название', width: '14rem' },
-    { id: 'price', label: 'Цена', width: '8rem' },
+    { id: 'price', label: adminPriceFieldLabel(), width: '9rem' },
     ...tableDictionaries.map((dictionary) => ({
       id: `dict:${dictionary.id}`,
       label: dictionary.name || dictionary.id,
@@ -1075,14 +1077,23 @@ export function AdminProductsCatalogPage() {
                         }
                         if (column.id === 'price') {
                           return (
-                            <input
-                              key={column.id}
-                              type="number"
-                              min={0}
-                              value={row.price}
-                              onChange={(e) => updateRow(row.id, { price: Number(e.target.value || 0) })}
-                              className={priceInputClass}
-                            />
+                            <div key={column.id} className="relative min-w-0">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={row.price}
+                                onChange={(e) =>
+                                  updateRow(row.id, { price: Number(e.target.value || 0) })
+                                }
+                                className={`${priceInputClass} pr-9`}
+                                aria-label={adminPriceFieldLabel(false)}
+                              />
+                              <BelarusRubleSign
+                                decorative
+                                className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-2 -translate-y-1/2 text-gray-500"
+                              />
+                            </div>
                           )
                         }
                         if (column.id === 'imageUrls') {
@@ -1324,14 +1335,23 @@ export function AdminProductsCatalogPage() {
                       />
                     </label>
                     <label className="rounded-md border border-white/10 bg-white/[0.03] p-3">
-                      <p className="text-xs text-gray-400">Цена</p>
-                    <input
-                      type="number"
-                      min={0}
-                      value={previewProduct.price}
-                      onChange={(e) => updateRow(previewProduct.id, { price: Number(e.target.value || 0) })}
-                      className={`${priceInputClass} mt-1`}
-                    />
+                      <p className="text-xs text-gray-400">{adminPriceFieldLabel()}</p>
+                      <div className="relative mt-1">
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={previewProduct.price}
+                          onChange={(e) =>
+                            updateRow(previewProduct.id, { price: Number(e.target.value || 0) })
+                          }
+                          className={`${priceInputClass} pr-9`}
+                        />
+                        <BelarusRubleSign
+                          decorative
+                          className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-2 -translate-y-1/2 text-gray-500"
+                        />
+                      </div>
                     </label>
                     {dictionariesDraft.dictionaries.map((dictionary) => {
                       const value = getDictionaryValue(previewProduct, dictionary.id)

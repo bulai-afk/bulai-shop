@@ -8,6 +8,8 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useCurrency } from '../context/CurrencyContext'
+import { convertBynToDisplay, parseStoreMoneyDigits } from '../lib/storeMoneyDisplay'
 import {
   Dialog,
   DialogBackdrop,
@@ -330,6 +332,7 @@ export function CatalogPage() {
   const [season, setSeason] = useState<ProductMeta['season'] | ''>('')
   const [inStockOnly, setInStockOnly] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('popular')
+  const { currency, rubOutPer100 } = useCurrency()
   const [currentPage, setCurrentPage] = useState(1)
 
   /** До отрисовки: чтобы при переходе с ?category= фильтр и раскрытие «Категория» были согласованы. */
@@ -392,7 +395,11 @@ export function CatalogPage() {
       const meta = metaById[product.id]
       if (!meta) return false
 
-      const productPrice = Number(product.price.replace(/[^\d]/g, ''))
+      const productPrice = convertBynToDisplay(
+        parseStoreMoneyDigits(product.price),
+        currency,
+        rubOutPer100,
+      )
       const hasCategory =
         categories.length === 0 ||
         categories.some((c) => (c === 'новинки' ? meta.isNew : meta.category === c))
@@ -442,6 +449,8 @@ export function CatalogPage() {
     season,
     inStockOnly,
     sortBy,
+    currency,
+    rubOutPer100,
   ])
 
   useEffect(() => {

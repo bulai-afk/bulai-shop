@@ -7,7 +7,7 @@ import { BulaiLogo } from '../components/BulaiLogo'
 import { ContactPhoneField } from '../components/ContactPhoneField'
 import { useAuth } from '../context/AuthContext'
 import { formatCartAmount, useCart, type CartLine } from '../context/CartContext'
-import { useCurrency } from '../context/CurrencyContext'
+import { MoneyWithGlyph } from '../components/MoneyWithGlyph'
 import { checkoutEmailFieldError, contactEmailError } from '../lib/contactEmail'
 import { formatPhoneForSummaryLine, isCompleteStoredPhoneDigits } from '../lib/contactPhoneInputDisplay'
 
@@ -90,7 +90,6 @@ function StepAccordionHeader({
 
 export function CheckoutPage() {
   const navigate = useNavigate()
-  const { symbol } = useCurrency()
   const { isAuthenticated, openAuthDialog, user } = useAuth()
   const {
     lines,
@@ -254,8 +253,8 @@ export function CheckoutPage() {
                             {line.name}
                           </Link>
                         </h3>
-                        <p className="shrink-0 text-sm font-medium tabular-nums text-gray-200">
-                          {formatCartAmount(lineSaleTotalRub(line))} {symbol}
+                        <p className="shrink-0 text-sm font-medium text-gray-200">
+                          <MoneyWithGlyph amount={formatCartAmount(lineSaleTotalRub(line))} />
                         </p>
                       </div>
                       {line.colorLabel ? (
@@ -363,13 +362,15 @@ export function CheckoutPage() {
                   <>
                     <div className="flex justify-between text-gray-400">
                       <p>Без скидок</p>
-                      <p className="tabular-nums line-through decoration-gray-500">
-                        {listPriceTotalFormatted} {symbol}
+                      <p className="line-through decoration-gray-500">
+                        <MoneyWithGlyph amount={listPriceTotalFormatted} />
                       </p>
                     </div>
                     <div className="flex justify-between text-emerald-400/95">
                       <p>Скидка на товары</p>
-                      <p className="tabular-nums">−{totalSavingsFormatted} {symbol}</p>
+                      <p>
+                        <MoneyWithGlyph amount={totalSavingsFormatted} prefix="−" />
+                      </p>
                     </div>
                   </>
                 ) : null}
@@ -378,15 +379,17 @@ export function CheckoutPage() {
                     <p>
                       Промокод {appliedPromoCode} (−{appliedPromoPercent}%)
                     </p>
-                    <p className="tabular-nums">−{promoDiscountFormatted} {symbol}</p>
+                    <p>
+                      <MoneyWithGlyph amount={promoDiscountFormatted} prefix="−" />
+                    </p>
                   </div>
                 ) : null}
               </div>
             ) : (
               <div className="mb-3 flex justify-between gap-4 border-b border-white/10 pb-4 text-sm">
                 <p className="text-gray-400">Товары</p>
-                <p className="tabular-nums font-medium text-gray-200">
-                  {subtotalFormatted} {symbol}
+                <p className="font-medium text-gray-200">
+                  <MoneyWithGlyph amount={subtotalFormatted} />
                 </p>
               </div>
             )}
@@ -398,8 +401,8 @@ export function CheckoutPage() {
               </div>
               <div className="flex justify-between gap-4 border-t border-white/10 pt-3 text-base font-semibold text-white">
                 <dt>Итого</dt>
-                <dd className="tabular-nums">
-                  {grandTotalFormatted} {symbol}
+                <dd>
+                  <MoneyWithGlyph amount={grandTotalFormatted} />
                 </dd>
               </div>
             </dl>

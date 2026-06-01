@@ -9,8 +9,10 @@ import {
 } from '@headlessui/react'
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline'
 import { CatalogProductCard } from '../components/CatalogProductCard'
+import { MoneyAmount } from '../components/MoneyAmount'
 import { ProductGalleryReviews } from '../components/ProductGalleryReviews'
 import { useCatalogInventory } from '../context/CatalogInventoryContext'
+import { useProductReviews } from '../hooks/useProductReviews'
 import { useCart } from '../context/CartContext'
 import { usePublicDocuments } from '../context/PublicDocumentsContext'
 import {
@@ -82,6 +84,11 @@ export function ProductPage() {
   const meta = productId ? metaById[productId] : undefined
   const { addItem } = useCart()
   const { productPageDocumentLinks, openDocumentInViewer } = usePublicDocuments()
+  const {
+    productRating: apiRating,
+    reviewCount: apiReviewCount,
+    loading: reviewsLoading,
+  } = useProductReviews(productId)
 
   const [selectedColorName, setSelectedColorName] = useState('')
   const [selectedSize, setSelectedSize] = useState('')
@@ -187,6 +194,9 @@ export function ProductPage() {
   }
 
   const related = getRelatedProducts(product.id, 4)
+  const displayReviewCount = reviewsLoading ? 0 : (apiReviewCount ?? 0)
+  const displayRating =
+    displayReviewCount > 0 ? (reviewsLoading ? 0 : (apiRating ?? 0)) : 0
 
   const activeSwatchForReview =
     product.colors.find((c) => c.name === selectedColorName) ?? product.colors[0]
@@ -290,7 +300,9 @@ export function ProductPage() {
                   <h3 className="text-sm font-medium text-white">Цена</h3>
                   <div className="mt-4">
                     <div className="relative inline-block">
-                      <p className="text-3xl tracking-tight text-indigo-400">{product.price}</p>
+                      <p className="text-3xl tracking-tight text-indigo-400">
+                        <MoneyAmount amount={product.price} />
+                      </p>
                       {product.discount ? (
                         <div className="absolute right-0 top-0 z-10 flex translate-x-4 -translate-y-[66%] items-center gap-2 whitespace-nowrap sm:translate-x-6">
                           {product.oldPrice ? (
@@ -298,7 +310,7 @@ export function ProductPage() {
                               className="text-sm text-gray-400 line-through sm:text-base"
                               aria-label={`Раньше ${product.oldPrice}`}
                             >
-                              {product.oldPrice}
+                              <MoneyAmount amount={product.oldPrice} symbolClassName="h-[0.78em] w-[0.5em]" />
                             </span>
                           ) : null}
                           <span className="rounded-md bg-rose-500/90 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white shadow-md sm:px-2 sm:text-xs">
@@ -312,7 +324,11 @@ export function ProductPage() {
                 <div>
                   <h3 className="text-sm font-medium text-white">Рейтинг</h3>
                   <div className="mt-4">
-                    <ProductRatingStars rating={product.rating} />
+                    {displayReviewCount > 0 ? (
+                      <ProductRatingStars rating={displayRating} />
+                    ) : (
+                      <p className="text-sm text-gray-500">Пока нет оценок</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -529,8 +545,6 @@ export function ProductPage() {
 
       <ProductGalleryReviews
         productId={product.id}
-        productRating={product.rating}
-        reviewCount={product.reviews}
         productPreview={{
           name: product.name,
           image: reviewPreviewImage,

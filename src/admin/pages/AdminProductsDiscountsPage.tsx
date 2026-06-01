@@ -16,6 +16,8 @@ import {
   loadProductsInventoryDraft,
   saveProductsInventoryDraft,
 } from '../lib/adminDraftStorage'
+import { MoneyAmount } from '../../components/MoneyAmount'
+import { adminPriceFieldLabel } from '../../lib/formatMoney'
 import type { ProductCatalogRow, ProductsInventoryDraft } from '../types/siteSettings'
 
 const inputClass =
@@ -26,10 +28,6 @@ const sectionClass = 'rounded-lg border border-white/10 bg-gray-950/60 p-6 shado
 function clampDiscountPercent(raw: number): number {
   if (!Number.isFinite(raw)) return 0
   return Math.min(100, Math.max(0, Math.round(raw)))
-}
-
-function formatRub(amount: number): string {
-  return `${new Intl.NumberFormat('ru-RU').format(Math.max(0, Math.round(amount)))} ₽`
 }
 
 function priceAfterDiscount(price: number, discountPercent: number): number {
@@ -436,7 +434,7 @@ export function AdminProductsDiscountsPage() {
                       sortKey === 'price' ? 'text-indigo-200' : ''
                     }`}
                   >
-                    Цена
+                    {adminPriceFieldLabel()}
                     {sortKey === 'price' ? (
                       sortDir === 'asc' ? (
                         <ChevronUpIcon className="size-3.5 shrink-0" aria-hidden />
@@ -544,7 +542,7 @@ export function AdminProductsDiscountsPage() {
                         <span className="truncate text-sm text-gray-200">{row.name}</span>
                       </div>
                       <div className="flex min-h-11 items-center justify-end px-2 text-right tabular-nums text-sm text-gray-300">
-                        {formatRub(row.price)}
+                        <MoneyAmount amount={row.price} storeCurrencyOnly />
                       </div>
                       <div className="flex min-h-11 items-center justify-center px-2">
                         <input
@@ -588,7 +586,7 @@ export function AdminProductsDiscountsPage() {
                                 inPeriod ? 'text-indigo-200/90' : 'text-gray-500 line-through'
                               }`}
                             >
-                              {formatRub(sale)}
+                              <MoneyAmount amount={sale} storeCurrencyOnly />
                             </span>
                             {!inPeriod && (row.discountValidFrom || row.discountValidTo) ? (
                               <span className="text-[10px] leading-tight text-amber-400/90">вне периода</span>

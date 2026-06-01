@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 import { fetchAdminProductsInventoryFromApi } from '../api/adminDataApi'
+import { fetchDevSyncInventory } from '../lib/devCatalogSync'
+import { fetchAllStoreReviews } from '../api/reviewsApi'
 import { isSiteConfigApiExpected } from '../constants/apiBase'
 import type { ProductCatalogRow } from '../admin/types/siteSettings'
 import {
@@ -17,9 +19,15 @@ import {
   type ProductMeta,
 } from '../data/catalogProducts'
 import { getRelatedProductsFromCatalog, mapCatalogRowsToStorefront } from '../utils/mapInventoryCatalogToStorefront'
+import {
+  applyReviewStatsToProducts,
+  buildProductReviewStatsMap,
+  type ProductReviewStats,
+} from '../utils/productReviewStatsMap'
 
 /** Совпадает с `PRODUCTS_INVENTORY_UPDATED_EVENT` в админке — обновление витрины после сохранения каталога. */
 const PRODUCTS_INVENTORY_UPDATED_EVENT = 'bulai-shop-products-inventory-updated'
+const REVIEWS_UPDATED_EVENT = 'bulai-shop-reviews-updated'
 
 type CatalogSource = 'api' | 'static'
 
@@ -42,7 +50,9 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
   const [apiRows, setApiRows] = useState<ProductCatalogRow[] | null>(null)
   const [source, setSource] = useState<CatalogSource>(apiExpected ? 'api' : 'static')
   const [hydrated, setHydrated] = useState(!apiExpected)
-
+  const [reviewStatsByProductId, setReviewStatsByProductId] = useState<
+    Record<string, ProductReviewStats>
+  >({})
   const applyStatic = useCallback(() => {
     setApiRows(null)
     setSource('static')
@@ -54,6 +64,17 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
     setSource('api')
   }, [])
 
+  const applyDevSyncFallback = useCallback(async (): Promise<boolean> => {
+    if (!import.meta.env.DEV) return false
+    const sync = await fetchDevSyncInventory()
+    if (sync?.catalog?.length) {
+      setSource('api')
+      setApiRows(sync.catalog)
+      return true
+    }
+    return false
+  }, [])
+
   const fetchInventory = useCallback(async () => {
     if (!apiExpected) {
       applyStatic()
@@ -62,18 +83,20 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
     }
     try {
       const draft = await fetchAdminProductsInventoryFromApi()
-      if (draft != null && Array.isArray(draft.catalog)) {
+      if (draft != null && Array.isArray(draft.catalog) && draft.catalog.length > 0) {
         setSource('api')
         setApiRows(draft.catalog)
         return
       }
+      if (await applyDevSyncFallback()) return
       applyEmptyApi()
     } catch {
+      if (await applyDevSyncFallback()) return
       applyEmptyApi()
     } finally {
       setHydrated(true)
     }
-  }, [apiExpected, applyStatic, applyEmptyApi])
+  }, [apiExpected, applyStatic, applyEmptyApi, applyDevSyncFallback])
 
   useEffect(() => {
     void fetchInventory()
@@ -88,7 +111,34 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
     return () => window.removeEventListener(PRODUCTS_INVENTORY_UPDATED_EVENT, onUpdate)
   }, [fetchInventory])
 
-  const { products, metaById } = useMemo(() => {
+  const loadReviewStats = useCallback(async () => {
+    if (!apiExpected) {
+      setReviewStatsByProductId({})
+      return
+    }
+    try {
+      const all = await fetchAllStoreReviews()
+      setReviewStatsByProductId(buildProductReviewStatsMap(all))
+    } catch {
+      setReviewStatsByProductId({})
+    }
+  }, [apiExpected])
+
+  useEffect(() => {
+    if (!hydrated) return
+    void loadReviewStats()
+  }, [hydrated, loadReviewStats])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onReviews = () => {
+      void loadReviewStats()
+    }
+    window.addEventListener(REVIEWS_UPDATED_EVENT, onReviews)
+    return () => window.removeEventListener(REVIEWS_UPDATED_EVENT, onReviews)
+  }, [loadReviewStats])
+
+  const { products: baseProducts, metaById } = useMemo(() => {
     if (apiExpected && !hydrated) {
       return { products: [] as Product[], metaById: {} as Record<string, ProductMeta> }
     }
@@ -100,6 +150,11 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
     }
     return { products: [] as Product[], metaById: {} as Record<string, ProductMeta> }
   }, [apiExpected, hydrated, source, apiRows])
+
+  const products = useMemo(
+    () => applyReviewStatsToProducts(baseProducts, reviewStatsByProductId),
+    [baseProducts, reviewStatsByProductId],
+  )
 
   const catalogFingerprint = useMemo(
     () => `${source}:${products.map((p) => `${p.id}:${p.price}`).join('|')}`,

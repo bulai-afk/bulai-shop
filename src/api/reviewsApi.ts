@@ -20,6 +20,23 @@ export async function fetchStoreReviews(page = 1, pageSize = 100): Promise<Revie
   return (await res.json()) as ReviewListResponse
 }
 
+/** Все отзывы витрины (для рейтингов в каталоге). */
+export async function fetchAllStoreReviews(): Promise<CatalogReview[]> {
+  const pageSize = 200
+  let page = 1
+  const all: CatalogReview[] = []
+  let total = Infinity
+  while (all.length < total) {
+    const data = await fetchStoreReviews(page, pageSize)
+    total = typeof data.total === 'number' ? data.total : data.items.length
+    if (data.items.length === 0) break
+    all.push(...data.items)
+    if (data.items.length < pageSize) break
+    page += 1
+  }
+  return all
+}
+
 export async function fetchProductReviews(
   productId: string,
   page = 1,

@@ -1,5 +1,6 @@
 import { createApp } from './app.js'
 import { config } from './config.js'
+import { seedDevCatalogFromSyncIfEmpty } from './lib/seedDevCatalogFromSync.js'
 
 const app = createApp()
 
@@ -11,6 +12,11 @@ const server = app.listen(config.port, () => {
   console.log(
     `[bulai-shop-api] http://127.0.0.1:${config.port}  (MariaDB: ${config.db.database}@${config.db.host})  ${reqLog}`,
   )
+  if (config.nodeEnv === 'development') {
+    void seedDevCatalogFromSyncIfEmpty().catch((err) => {
+      console.warn('[bulai-shop-api] dev seed skipped:', err instanceof Error ? err.message : err)
+    })
+  }
 })
 
 server.on('error', (err: NodeJS.ErrnoException) => {

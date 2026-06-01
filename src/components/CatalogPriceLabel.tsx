@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 type CatalogPriceLabelProps = {
   /** Актуальная цена (строка из каталога или форматированная сумма). */
   price: ReactNode
-  oldPrice?: string
+  oldPrice?: ReactNode
   discount?: string
   className?: string
 }

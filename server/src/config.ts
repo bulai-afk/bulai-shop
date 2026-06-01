@@ -31,4 +31,6 @@ export const config = {
   ),
   /** Каталог Vite `dist/` — витрина с одного origin с API (деплой на Hoster.by). */
   staticDir: (process.env.STATIC_DIR ?? '').trim(),
+  /** Населённый пункт для https://belarusbank.by/api/kursExchange?city=… */
+  belarusbankKursCity: (process.env.BELARUSBANK_KURS_CITY ?? 'Минск').trim() || 'Минск',
 } as const

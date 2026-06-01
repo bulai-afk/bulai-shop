@@ -6,7 +6,7 @@ import { CatalogPriceLabel } from './CatalogPriceLabel'
 import { PanelScrollArea } from './PanelScrollArea'
 import { drawerPanelScrollbarRailClass } from './scrollbarShared'
 import { formatCartAmount, useCart, type CartLine } from '../context/CartContext'
-import { useCurrency } from '../context/CurrencyContext'
+import { MoneyWithGlyph } from './MoneyWithGlyph'
 
 function lineSaleTotalRub(line: CartLine): number {
   const unit = parseInt(line.priceDisplay.replace(/\D/g, ''), 10) || 0
@@ -36,7 +36,6 @@ export function CartDrawer() {
     incrementQuantity,
     decrementQuantity,
   } = useCart()
-  const { symbol } = useCurrency()
   const promoInputId = useId()
   const [promoCode, setPromoCode] = useState('')
   const [promoHint, setPromoHint] = useState<'error' | null>(null)
@@ -120,16 +119,18 @@ export function CartDrawer() {
                                     <div className="shrink-0 text-right">
                                       <CatalogPriceLabel
                                         price={
-                                          <span className="tabular-nums">
-                                            {formatCartAmount(lineSaleTotalRub(product))} {symbol}
-                                          </span>
+                                          <MoneyWithGlyph
+                                            amount={formatCartAmount(lineSaleTotalRub(product))}
+                                          />
                                         }
                                         oldPrice={
                                           product.discountLabel &&
                                           product.oldPriceDisplay &&
-                                          lineCatalogTotalRub(product) > lineSaleTotalRub(product)
-                                            ? `${formatCartAmount(lineCatalogTotalRub(product))} ${symbol}`
-                                            : undefined
+                                          lineCatalogTotalRub(product) > lineSaleTotalRub(product) ? (
+                                            <MoneyWithGlyph
+                                              amount={formatCartAmount(lineCatalogTotalRub(product))}
+                                            />
+                                          ) : undefined
                                         }
                                         discount={product.discountLabel}
                                       />
@@ -148,12 +149,14 @@ export function CartDrawer() {
                                     {product.quantity > 1 ? (
                                       <span className="text-gray-500">
                                         {' '}
-                                        · {product.priceDisplay} за шт.
+                                        ·{' '}
+                                        <MoneyWithGlyph amount={product.priceDisplay} /> за шт.
                                         {product.oldPriceDisplay ? (
                                           <>
                                             {' '}
                                             <span className="line-through opacity-80">
-                                              (было {product.oldPriceDisplay})
+                                              (было{' '}
+                                              <MoneyWithGlyph amount={product.oldPriceDisplay} />)
                                             </span>
                                           </>
                                         ) : null}
@@ -267,13 +270,15 @@ export function CartDrawer() {
                             <>
                               <div className="flex justify-between text-sm text-gray-400">
                                 <p>Без скидок</p>
-                                <p className="tabular-nums line-through decoration-gray-500">
-                                  {listPriceTotalFormatted} {symbol}
+                                <p className="line-through decoration-gray-500">
+                                  <MoneyWithGlyph amount={listPriceTotalFormatted} />
                                 </p>
                               </div>
                               <div className="flex justify-between text-sm text-emerald-400/95">
                                 <p>Скидка на товары</p>
-                                <p className="tabular-nums">−{totalSavingsFormatted} {symbol}</p>
+                                <p>
+                                  <MoneyWithGlyph amount={totalSavingsFormatted} prefix="−" />
+                                </p>
                               </div>
                             </>
                           ) : null}
@@ -282,7 +287,9 @@ export function CartDrawer() {
                               <p>
                                 Промокод {appliedPromoCode} (−{appliedPromoPercent}%)
                               </p>
-                              <p className="tabular-nums">−{promoDiscountFormatted} {symbol}</p>
+                              <p>
+                                <MoneyWithGlyph amount={promoDiscountFormatted} prefix="−" />
+                              </p>
                             </div>
                           ) : null}
                         </div>
@@ -290,8 +297,8 @@ export function CartDrawer() {
 
                       <div className="flex justify-between text-base font-semibold text-white">
                         <p>К оплате</p>
-                        <p className="tabular-nums">
-                          {grandTotalFormatted} {symbol}
+                        <p>
+                          <MoneyWithGlyph amount={grandTotalFormatted} />
                         </p>
                       </div>
                       <p className="mt-0.5 text-sm text-gray-500">

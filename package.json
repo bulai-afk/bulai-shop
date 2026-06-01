@@ -8,6 +8,7 @@
     "dev": "vite",
     "dev:api": "npm run dev --prefix server",
     "dev:stack": "concurrently -n web,api -c blue,green \"npm run dev\" \"npm run dev:api\"",
+    "seed:catalog": "node scripts/import-products-to-local-api.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
