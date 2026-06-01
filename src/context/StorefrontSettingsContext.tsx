@@ -10,12 +10,13 @@ import { buildDefaultPromoMaterials, buildDefaultSiteConfig } from '../admin/dat
 import type { PromoMaterialsForm, SiteConfigForm } from '../admin/types/siteSettings'
 import { fetchPromoMaterialsFromApi } from '../api/promoMaterialsApi'
 import { fetchSiteConfigFromApi } from '../api/siteConfigApi'
+import { isSiteConfigApiExpected } from '../constants/apiBase'
 import { mergePromoMaterialsForm } from '../utils/promoMaterialsForm'
 import { mergeSiteConfigForm } from '../utils/siteConfigForm'
 
 type StorefrontSettingsContextValue = {
-  siteConfig: SiteConfigForm
-  promoMaterials: PromoMaterialsForm
+  siteConfig: SiteConfigForm | null
+  promoMaterials: PromoMaterialsForm | null
   /** Первичная загрузка с API (успешная или с ошибкой) ещё не завершена */
   loading: boolean
 }
@@ -27,13 +28,17 @@ const StorefrontSettingsContext = createContext<StorefrontSettingsContextValue |
  * Оборачивает разметку `Layout`; админка этим провайдером не пользуется.
  */
 export function StorefrontSettingsProvider({ children }: { children: ReactNode }) {
-  const [siteConfig, setSiteConfig] = useState<SiteConfigForm>(() => buildDefaultSiteConfig())
-  const [promoMaterials, setPromoMaterials] = useState<PromoMaterialsForm>(() =>
-    buildDefaultPromoMaterials(),
+  const apiExpected = isSiteConfigApiExpected()
+  const [siteConfig, setSiteConfig] = useState<SiteConfigForm | null>(() =>
+    apiExpected ? null : buildDefaultSiteConfig(),
   )
-  const [loading, setLoading] = useState(true)
+  const [promoMaterials, setPromoMaterials] = useState<PromoMaterialsForm | null>(() =>
+    apiExpected ? null : buildDefaultPromoMaterials(),
+  )
+  const [loading, setLoading] = useState(apiExpected)
 
   useEffect(() => {
+    if (!apiExpected) return
     let cancelled = false
     ;(async () => {
       try {
@@ -42,10 +47,13 @@ export function StorefrontSettingsProvider({ children }: { children: ReactNode }
           fetchPromoMaterialsFromApi(),
         ])
         if (cancelled) return
-        if (sc != null) setSiteConfig(mergeSiteConfigForm(sc))
-        if (pm != null) setPromoMaterials(mergePromoMaterialsForm(pm))
+        setSiteConfig(sc != null ? mergeSiteConfigForm(sc) : buildDefaultSiteConfig())
+        setPromoMaterials(pm != null ? mergePromoMaterialsForm(pm) : buildDefaultPromoMaterials())
       } catch {
-        /* офлайн, нет прокси /api, 5xx — остаются дефолты */
+        if (!cancelled) {
+          setSiteConfig(buildDefaultSiteConfig())
+          setPromoMaterials(buildDefaultPromoMaterials())
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -53,7 +61,7 @@ export function StorefrontSettingsProvider({ children }: { children: ReactNode }
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [apiExpected])
 
   const value = useMemo(
     () => ({ siteConfig, promoMaterials, loading }),
@@ -74,11 +82,13 @@ function useStorefrontSettings(): StorefrontSettingsContextValue {
 }
 
 export function useStorefrontSiteConfig(): SiteConfigForm {
-  return useStorefrontSettings().siteConfig
+  const { siteConfig } = useStorefrontSettings()
+  return siteConfig ?? buildDefaultSiteConfig()
 }
 
 export function useStorefrontPromoMaterials(): PromoMaterialsForm {
-  return useStorefrontSettings().promoMaterials
+  const { promoMaterials } = useStorefrontSettings()
+  return promoMaterials ?? buildDefaultPromoMaterials()
 }
 
 export function useStorefrontSettingsLoading(): boolean {

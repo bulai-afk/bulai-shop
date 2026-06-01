@@ -7,6 +7,7 @@ import {
 import { PublicDocumentsProvider } from '../context/PublicDocumentsContext'
 import { CatalogDictionariesProvider } from '../context/CatalogDictionariesContext'
 import { StorefrontSettingsProvider } from '../context/StorefrontSettingsContext'
+import { StorefrontBootstrapGate } from './StorefrontBootstrapGate'
 import { AuthDialog } from './AuthDialog'
 import { YandexWelcomeDialog } from './YandexWelcomeDialog'
 import { CartDrawer } from './CartDrawer'
@@ -94,7 +95,9 @@ export function Layout() {
       <PublicDocumentsProvider>
         <StorefrontSettingsProvider>
           <CatalogDictionariesProvider>
-            <LayoutContent />
+            <StorefrontBootstrapGate>
+              <LayoutContent />
+            </StorefrontBootstrapGate>
           </CatalogDictionariesProvider>
         </StorefrontSettingsProvider>
       </PublicDocumentsProvider>

@@ -9,28 +9,42 @@ import {
 } from 'react'
 import { fetchAdminProductsDictionariesFromApi } from '../api/adminDataApi'
 import { isSiteConfigApiExpected } from '../constants/apiBase'
-import { buildDefaultProductsDictionaries } from '../admin/data/siteSettingsDefaults'
 import type { ProductsDictionariesDraft } from '../admin/types/siteSettings'
 
 const PRODUCTS_DICTIONARIES_UPDATED_EVENT = 'bulai-shop-products-dictionaries-updated'
 
-const CatalogDictionariesContext = createContext<ProductsDictionariesDraft | null>(null)
+const EMPTY_PRODUCTS_DICTIONARIES: ProductsDictionariesDraft = {
+  dictionaries: [],
+  skuSourceDictionaryIds: [],
+}
+
+type CatalogDictionariesContextValue = {
+  draft: ProductsDictionariesDraft | null
+  hydrated: boolean
+}
+
+const CatalogDictionariesContext = createContext<CatalogDictionariesContextValue | null>(null)
 
 export function CatalogDictionariesProvider({ children }: { children: ReactNode }) {
+  const apiExpected = isSiteConfigApiExpected()
   const [draft, setDraft] = useState<ProductsDictionariesDraft | null>(null)
+  const [hydrated, setHydrated] = useState(!apiExpected)
 
   const fetchDictionaries = useCallback(async () => {
-    if (!isSiteConfigApiExpected()) {
+    if (!apiExpected) {
       setDraft(null)
+      setHydrated(true)
       return
     }
     try {
       const remote = await fetchAdminProductsDictionariesFromApi()
-      setDraft(remote ?? buildDefaultProductsDictionaries())
+      setDraft(remote ?? EMPTY_PRODUCTS_DICTIONARIES)
     } catch {
-      setDraft(null)
+      setDraft(EMPTY_PRODUCTS_DICTIONARIES)
+    } finally {
+      setHydrated(true)
     }
-  }, [])
+  }, [apiExpected])
 
   useEffect(() => {
     void fetchDictionaries()
@@ -44,7 +58,7 @@ export function CatalogDictionariesProvider({ children }: { children: ReactNode 
     return () => window.removeEventListener(PRODUCTS_DICTIONARIES_UPDATED_EVENT, onUpdate)
   }, [fetchDictionaries])
 
-  const value = useMemo(() => draft, [draft])
+  const value = useMemo(() => ({ draft, hydrated }), [draft, hydrated])
 
   return (
     <CatalogDictionariesContext.Provider value={value}>{children}</CatalogDictionariesContext.Provider>
@@ -52,5 +66,9 @@ export function CatalogDictionariesProvider({ children }: { children: ReactNode 
 }
 
 export function useCatalogDictionaries(): ProductsDictionariesDraft | null {
-  return useContext(CatalogDictionariesContext)
+  return useContext(CatalogDictionariesContext)?.draft ?? null
+}
+
+export function useCatalogDictionariesHydrated(): boolean {
+  return useContext(CatalogDictionariesContext)?.hydrated ?? true
 }

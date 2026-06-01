@@ -43,11 +43,7 @@ import { useMainScrollbarSuppression } from '../context/MainScrollbarSuppression
 import { getPageScrollElement } from '../utils/getPageScrollElement'
 
 import { CATALOG_KEY_DETAILS_SLUG_ORDER } from '../constants/catalogCategoryPromo'
-import {
-  useStorefrontPromoMaterials,
-  useStorefrontSettingsLoading,
-} from '../context/StorefrontSettingsContext'
-import { isSiteConfigApiExpected } from '../constants/apiBase'
+import { useStorefrontPromoMaterials } from '../context/StorefrontSettingsContext'
 import {
   parseCategoriesFromQueryParam,
   categoriesToQueryParam,
@@ -187,11 +183,8 @@ const CatalogProductsBar = memo(function CatalogProductsBar({
 })
 
 export function CatalogPage() {
-  const settingsLoading = useStorefrontSettingsLoading()
-  const { products, metaById, hydrated: catalogHydrated } = useCatalogInventory()
+  const { products, metaById } = useCatalogInventory()
   const { catalogKeyDetailsSection, categoryVisuals } = useStorefrontPromoMaterials()
-  const apiGate = isSiteConfigApiExpected()
-  const catalogReady = !apiGate || (catalogHydrated && !settingsLoading)
   const { reviews: storeReviews, reload: reloadStoreReviews } = useStoreReviews()
   const { isAuthenticated, openAuthDialog } = useAuth()
   const getScroller = () => getPageScrollElement()
@@ -505,16 +498,6 @@ export function CatalogPage() {
         return n
       },
       { replace: true },
-    )
-  }
-
-  if (!catalogReady) {
-    return (
-      <section className="pt-0">
-        <div className="flex min-h-[50vh] items-center justify-center px-4 py-16">
-          <p className="text-sm text-gray-400">Загрузка каталога…</p>
-        </div>
-      </section>
     )
   }
 
