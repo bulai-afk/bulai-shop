@@ -7,6 +7,7 @@ import { promoMaterialsRouter } from './promoMaterials.js'
 import { authSessionRouter } from './authSession.js'
 import { siteConfigRouter } from './siteConfig.js'
 import { storefrontClientProfileRouter } from './storefrontClientProfile.js'
+import { productReviewsRouter, reviewsRouter } from './reviews.js'
 
 export const apiRouter = Router()
 
@@ -21,6 +22,8 @@ apiRouter.use('/promo-codes', promoCodesCatalogRouter)
 apiRouter.use('/admin/data', adminDataRouter)
 apiRouter.use('/auth', authSessionRouter)
 apiRouter.use('/profile', storefrontClientProfileRouter)
+apiRouter.use('/reviews', reviewsRouter)
+apiRouter.use('/products', productReviewsRouter)
 
 apiRouter.get('/health', (_req, res) => {
   res.json({

@@ -5,6 +5,7 @@ import {
   useMainScrollbarSuppression,
 } from '../context/MainScrollbarSuppressionContext'
 import { PublicDocumentsProvider } from '../context/PublicDocumentsContext'
+import { CatalogDictionariesProvider } from '../context/CatalogDictionariesContext'
 import { StorefrontSettingsProvider } from '../context/StorefrontSettingsContext'
 import { AuthDialog } from './AuthDialog'
 import { YandexWelcomeDialog } from './YandexWelcomeDialog'
@@ -92,7 +93,9 @@ export function Layout() {
     <MainScrollbarSuppressionProvider>
       <PublicDocumentsProvider>
         <StorefrontSettingsProvider>
-          <LayoutContent />
+          <CatalogDictionariesProvider>
+            <LayoutContent />
+          </CatalogDictionariesProvider>
         </StorefrontSettingsProvider>
       </PublicDocumentsProvider>
     </MainScrollbarSuppressionProvider>

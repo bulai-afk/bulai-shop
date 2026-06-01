@@ -1,6 +1,7 @@
 import { ArrowUpTrayIcon, InformationCircleIcon, PhotoIcon, TrashIcon } from '@heroicons/react/24/outline'
 import type { FormEvent, ReactNode } from 'react'
 import { ProfileSaveToast } from '../../components/ProfileSaveToast'
+import { AdminPromoDbSyncBanner } from '../components/AdminPromoDbSyncBanner'
 import { useAdminPromoMaterialsForm } from '../hooks/useAdminPromoMaterialsForm'
 import type { PromoValueIconId } from '../types/siteSettings'
 
@@ -46,7 +47,7 @@ function Section({
 }
 
 export function AdminPromoAboutPage() {
-  const { promo, setPromo, mounted, save, savedFlash, setSavedFlash, apiError, setApiError } =
+  const { promo, setPromo, mounted, save, savedFlash, setSavedFlash, apiError, setApiError, dbPromoEmpty } =
     useAdminPromoMaterialsForm()
 
   const onSubmit = async (e: FormEvent) => {
@@ -102,6 +103,8 @@ export function AdminPromoAboutPage() {
         <p className="mt-2 max-w-prose text-sm text-gray-400">
           Hero с фотографиями, блок «Миссия» и «Ценности» на странице `/about`.
         </p>
+
+        <AdminPromoDbSyncBanner show={dbPromoEmpty} />
 
         <div className="mt-4 flex items-start gap-2 rounded-lg border border-indigo-500/20 bg-indigo-950/30 px-3 py-2.5 text-sm text-indigo-100/90">
           <InformationCircleIcon className="mt-0.5 size-5 shrink-0 text-indigo-400" aria-hidden />

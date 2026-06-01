@@ -27,6 +27,8 @@ export type CatalogInventoryContextValue = {
   products: Product[]
   metaById: Record<string, ProductMeta>
   source: CatalogSource
+  /** false до первого ответа API на проде — не показывать демо-каталог. */
+  hydrated: boolean
   /** Для синхронизации корзины при смене каталога или цен. */
   catalogFingerprint: string
   getProductById: (id: string) => Product | undefined
@@ -36,17 +38,26 @@ export type CatalogInventoryContextValue = {
 const CatalogInventoryContext = createContext<CatalogInventoryContextValue | null>(null)
 
 export function CatalogInventoryProvider({ children }: { children: ReactNode }) {
+  const apiExpected = isSiteConfigApiExpected()
   const [apiRows, setApiRows] = useState<ProductCatalogRow[] | null>(null)
-  const [source, setSource] = useState<CatalogSource>('static')
+  const [source, setSource] = useState<CatalogSource>(apiExpected ? 'api' : 'static')
+  const [hydrated, setHydrated] = useState(!apiExpected)
 
   const applyStatic = useCallback(() => {
     setApiRows(null)
     setSource('static')
   }, [])
 
+  /** На проде без снимка в БД — пустой каталог, не демо из `catalogProducts.ts`. */
+  const applyEmptyApi = useCallback(() => {
+    setApiRows([])
+    setSource('api')
+  }, [])
+
   const fetchInventory = useCallback(async () => {
-    if (!isSiteConfigApiExpected()) {
+    if (!apiExpected) {
       applyStatic()
+      setHydrated(true)
       return
     }
     try {
@@ -56,11 +67,13 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
         setApiRows(draft.catalog)
         return
       }
-      applyStatic()
+      applyEmptyApi()
     } catch {
-      applyStatic()
+      applyEmptyApi()
+    } finally {
+      setHydrated(true)
     }
-  }, [applyStatic])
+  }, [apiExpected, applyStatic, applyEmptyApi])
 
   useEffect(() => {
     void fetchInventory()
@@ -76,11 +89,17 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
   }, [fetchInventory])
 
   const { products, metaById } = useMemo(() => {
+    if (apiExpected && !hydrated) {
+      return { products: [] as Product[], metaById: {} as Record<string, ProductMeta> }
+    }
     if (source === 'api' && apiRows !== null) {
       return mapCatalogRowsToStorefront(apiRows)
     }
-    return { products: staticProducts, metaById: staticMetaById }
-  }, [source, apiRows])
+    if (source === 'static') {
+      return { products: staticProducts, metaById: staticMetaById }
+    }
+    return { products: [] as Product[], metaById: {} as Record<string, ProductMeta> }
+  }, [apiExpected, hydrated, source, apiRows])
 
   const catalogFingerprint = useMemo(
     () => `${source}:${products.map((p) => `${p.id}:${p.price}`).join('|')}`,
@@ -103,11 +122,12 @@ export function CatalogInventoryProvider({ children }: { children: ReactNode }) 
       products,
       metaById,
       source,
+      hydrated,
       catalogFingerprint,
       getProductById,
       getRelatedProducts,
     }),
-    [products, metaById, source, catalogFingerprint, getProductById, getRelatedProducts],
+    [products, metaById, source, hydrated, catalogFingerprint, getProductById, getRelatedProducts],
   )
 
   return <CatalogInventoryContext.Provider value={value}>{children}</CatalogInventoryContext.Provider>

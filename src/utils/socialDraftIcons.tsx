@@ -1,6 +1,6 @@
-import type { SVGProps } from 'react'
-import type { ReactElement } from 'react'
+import type { ReactElement, SVGProps } from 'react'
 import { STORE_SOCIAL_LINKS } from '../constants/storeContact'
+import { socialIconComponentForId, type SocialIconComponent } from '../constants/socialNetworkIcons'
 
 type IconFn = (props: SVGProps<SVGSVGElement>) => ReactElement
 
@@ -8,25 +8,15 @@ const byStoreName = new Map<string, IconFn>(
   STORE_SOCIAL_LINKS.map((l) => [l.name.toLowerCase(), l.icon]),
 )
 
-/** Соответствие id из админки иконкам из справочника витрины. */
-const ID_TO_STORE_NAME: Record<string, string> = {
-  vk: 'VK',
-  telegram: 'Telegram',
-  youtube: 'YouTube',
-  whatsapp: 'WhatsApp',
-  viber: 'Viber',
-  instagram: 'Instagram',
-  facebook: 'Facebook',
+function wrapComponent(comp: SocialIconComponent): IconFn {
+  return (props) => comp({ className: props.className })
 }
 
-/** Иконка для соцссылки из черновика настроек; иначе null — показать универсальную ссылку. */
+/** Иконка для соцссылки из настроек сайта; иначе null — показать универсальную ссылку. */
 export function socialIconFromDraft(id: string, name: string): IconFn | null {
-  const idKey = id.trim().toLowerCase()
-  const mapped = ID_TO_STORE_NAME[idKey]
-  if (mapped) {
-    const fn = byStoreName.get(mapped.toLowerCase())
-    if (fn) return fn
-  }
+  const fromId = socialIconComponentForId(id)
+  if (fromId) return wrapComponent(fromId)
+
   const byName = byStoreName.get(name.trim().toLowerCase())
   return byName ?? null
 }

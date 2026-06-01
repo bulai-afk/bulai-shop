@@ -43,7 +43,11 @@ import { useMainScrollbarSuppression } from '../context/MainScrollbarSuppression
 import { getPageScrollElement } from '../utils/getPageScrollElement'
 
 import { CATALOG_KEY_DETAILS_SLUG_ORDER } from '../constants/catalogCategoryPromo'
-import { useStorefrontPromoMaterials } from '../context/StorefrontSettingsContext'
+import {
+  useStorefrontPromoMaterials,
+  useStorefrontSettingsLoading,
+} from '../context/StorefrontSettingsContext'
+import { isSiteConfigApiExpected } from '../constants/apiBase'
 import {
   parseCategoriesFromQueryParam,
   categoriesToQueryParam,
@@ -51,7 +55,9 @@ import {
   type CategoryOption,
 } from '../data/catalogProducts'
 import { categoryVisualBySlug } from '../utils/categoryVisualsStorefront'
-import { MOCK_CATALOG_REVIEWS } from '../data/mockCatalogReviews'
+import { postStoreReview } from '../api/reviewsApi'
+import { useAuth } from '../context/AuthContext'
+import { useStoreReviews, notifyReviewsUpdated } from '../hooks/useStoreReviews'
 
 const CATEGORY_OPTIONS: CategoryOption[] = ['новинки', 'майки', 'рубашки', 'брюки']
 const SIZE_OPTIONS = ['L', 'XL', 'XXL'] as const
@@ -181,8 +187,13 @@ const CatalogProductsBar = memo(function CatalogProductsBar({
 })
 
 export function CatalogPage() {
-  const { products, metaById } = useCatalogInventory()
+  const settingsLoading = useStorefrontSettingsLoading()
+  const { products, metaById, hydrated: catalogHydrated } = useCatalogInventory()
   const { catalogKeyDetailsSection, categoryVisuals } = useStorefrontPromoMaterials()
+  const apiGate = isSiteConfigApiExpected()
+  const catalogReady = !apiGate || (catalogHydrated && !settingsLoading)
+  const { reviews: storeReviews, reload: reloadStoreReviews } = useStoreReviews()
+  const { isAuthenticated, openAuthDialog } = useAuth()
   const getScroller = () => getPageScrollElement()
 
   const lastVisibleCardRef = useRef<HTMLLIElement | null>(null)
@@ -205,6 +216,7 @@ export function CatalogPage() {
   const toggleCatalogGridDensity = useCallback(() => setCatalogGridDense((d) => !d), [])
   const [reviewStarsFilter, setReviewStarsFilter] = useState<number | null>(null)
   const [writeReviewOpen, setWriteReviewOpen] = useState(false)
+  const [reviewSubmitError, setReviewSubmitError] = useState<string | null>(null)
   const [productPanelAtBottom, setProductPanelAtBottom] = useState(false)
   /** Удерживает «низ панели» после кратких false от гистерезиса — иначе основной скроллбар мигает. */
   const [productPanelAtBottomDebounced, setProductPanelAtBottomDebounced] = useState(false)
@@ -493,6 +505,16 @@ export function CatalogPage() {
         return n
       },
       { replace: true },
+    )
+  }
+
+  if (!catalogReady) {
+    return (
+      <section className="pt-0">
+        <div className="flex min-h-[50vh] items-center justify-center px-4 py-16">
+          <p className="text-sm text-gray-400">Загрузка каталога…</p>
+        </div>
+      </section>
     )
   }
 
@@ -1201,7 +1223,7 @@ export function CatalogPage() {
             <div className="px-4 py-10 sm:px-6 lg:px-8">
             <div className="w-full overflow-hidden rounded-lg">
               {(() => {
-                const recentReviews = MOCK_CATALOG_REVIEWS
+                const recentReviews = storeReviews
 
                 const total = recentReviews.length
                 const avg = total === 0 ? 0 : recentReviews.reduce((acc, r) => acc + r.rating, 0) / total
@@ -1350,9 +1372,19 @@ export function CatalogPage() {
                         <p className="mt-1 text-sm text-gray-300">
                           Если вы покупали у нас, оставьте отзыв — это помогает другим выбрать.
                         </p>
+                        {reviewSubmitError ? (
+                          <p className="mt-3 text-sm text-red-400">{reviewSubmitError}</p>
+                        ) : null}
                         <button
                           type="button"
-                          onClick={() => setWriteReviewOpen(true)}
+                          onClick={() => {
+                            setReviewSubmitError(null)
+                            if (!isAuthenticated) {
+                              openAuthDialog({ mode: 'signin' })
+                              return
+                            }
+                            setWriteReviewOpen(true)
+                          }}
                           className="mt-6 w-full rounded-lg bg-slate-700/65 px-4 py-2.5 text-center text-sm font-semibold text-gray-100 transition hover:bg-slate-600/75"
                         >
                           Написать отзыв
@@ -1374,8 +1406,13 @@ export function CatalogPage() {
 
                         <div className="flow-root">
                           <div className="-my-6 divide-y divide-white/10">
+                          {filteredRecentReviews.length === 0 ? (
+                            <p className="py-8 text-center text-sm text-gray-400">
+                              Пока нет отзывов. Будьте первым — нажмите «Написать отзыв».
+                            </p>
+                          ) : null}
                           {filteredRecentReviews.map((review) => (
-                              <div key={review.name} className="py-6">
+                              <div key={review.id} className="py-6">
                               <div className="flex items-center">
                                 <img
                                   src={review.avatar}
@@ -1415,7 +1452,20 @@ export function CatalogPage() {
           </div>
         </section>
 
-        <WriteReviewDialog open={writeReviewOpen} onClose={() => setWriteReviewOpen(false)} />
+        <WriteReviewDialog
+          open={writeReviewOpen}
+          onClose={() => setWriteReviewOpen(false)}
+          onSubmit={async (payload) => {
+            setReviewSubmitError(null)
+            try {
+              await postStoreReview({ ...payload, productId: null })
+              notifyReviewsUpdated()
+              await reloadStoreReviews()
+            } catch {
+              setReviewSubmitError('Не удалось отправить отзыв. Войдите в аккаунт и попробуйте снова.')
+            }
+          }}
+        />
       </div>
     </section>
   )

@@ -262,6 +262,10 @@ export type ProductDictionaryValue = {
   id: string
   value: string
   color: string
+  /** Фото для мегаменю (справочник «Категория»). */
+  imageUrl: string
+  /** Slug для `/catalog?category=`; пусто — из названия (новинки → novinki и т.д.). */
+  catalogSlug: string
 }
 
 export type ProductsDictionariesDraft = {

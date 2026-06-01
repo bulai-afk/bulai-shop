@@ -10,6 +10,8 @@ import {
 } from 'react'
 import { fetchPromoCodesCatalogFromApi } from '../api/promoCodesCatalogApi'
 import { type Product } from '../data/catalogProducts'
+import { cartStorageKey, readStoredCart, writeStoredCart } from '../lib/cartStorage'
+import { useAuth } from './AuthContext'
 import { useCatalogInventory } from './CatalogInventoryContext'
 import { promoCatalogRowsToPercentMap } from '../utils/promoCodePercentMap'
 
@@ -46,26 +48,27 @@ export const CART_PROMO_CODES: Record<string, number> = {
   HELLO15: 15,
 }
 
-function buildInitialLines(products: Product[]): CartLine[] {
-  if (products.length === 0) return []
-  return products.slice(0, 3).map((p) => {
-    const c = p.colors[0]
-    return {
-      lineId: `seed-${p.id}`,
-      productId: p.id,
+function syncLinesWithCatalog(prev: CartLine[], products: Product[]): CartLine[] {
+  if (products.length === 0) return prev
+  const byId = Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, Product>
+  const next: CartLine[] = []
+  for (const line of prev) {
+    const p = byId[line.productId]
+    if (!p) continue
+    const swatch = p.colors.find((c) => c.name === line.colorLabel) ?? p.colors[0]
+    next.push({
+      ...line,
       name: p.name,
       href: `/product/${p.id}`,
-      colorLabel: c?.name ?? '',
-      colorSwatchClassName: c?.className,
-      sizeLabel: p.sizes[0] ?? '',
       priceDisplay: p.price,
       oldPriceDisplay: p.oldPrice,
       discountLabel: p.discount,
-      quantity: 1,
-      imageSrc: c?.image ?? p.image,
-      imageAlt: `${p.name}, цвет ${c?.name ?? ''}`,
-    }
-  })
+      imageSrc: swatch?.image ?? p.image,
+      imageAlt: `${p.name}, цвет ${swatch?.name ?? line.colorLabel}`,
+      colorSwatchClassName: swatch?.className,
+    })
+  }
+  return next
 }
 
 type CartContextValue = {
@@ -100,51 +103,43 @@ type CartContextValue = {
 const CartContext = createContext<CartContextValue | null>(null)
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { user, hydrated: authHydrated } = useAuth()
   const { products, catalogFingerprint } = useCatalogInventory()
+  const storageKey = cartStorageKey(user?.email)
   const [lines, setLines] = useState<CartLine[]>([])
-  const lastCatalogFingerprintRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    const fp = catalogFingerprint
-    if (lastCatalogFingerprintRef.current === fp) return
-
-    if (lastCatalogFingerprintRef.current === null) {
-      setLines(buildInitialLines(products))
-      lastCatalogFingerprintRef.current = fp
-      return
-    }
-
-    lastCatalogFingerprintRef.current = fp
-    const byId = Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, Product>
-    setLines((prev) => {
-      const next: CartLine[] = []
-      for (const line of prev) {
-        const p = byId[line.productId]
-        if (!p) continue
-        const swatch = p.colors.find((c) => c.name === line.colorLabel) ?? p.colors[0]
-        next.push({
-          ...line,
-          name: p.name,
-          href: `/product/${p.id}`,
-          priceDisplay: p.price,
-          oldPriceDisplay: p.oldPrice,
-          discountLabel: p.discount,
-          imageSrc: swatch?.image ?? p.image,
-          imageAlt: `${p.name}, цвет ${swatch?.name ?? line.colorLabel}`,
-          colorSwatchClassName: swatch?.className,
-        })
-      }
-      if (next.length === 0 && prev.length > 0) {
-        return buildInitialLines(products)
-      }
-      return next
-    })
-  }, [catalogFingerprint, products])
   const [isOpen, setOpen] = useState(false)
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null)
   const [promoPercentByCode, setPromoPercentByCode] = useState<Record<string, number>>(() => ({
     ...CART_PROMO_CODES,
   }))
+  const lastCatalogFingerprintRef = useRef<string | null>(null)
+  const skipPersistRef = useRef(true)
+  const storageKeyRef = useRef(storageKey)
+
+  useEffect(() => {
+    if (!authHydrated) return
+    skipPersistRef.current = true
+    const stored = readStoredCart(storageKey)
+    setLines(stored.lines)
+    setAppliedPromoCode(stored.appliedPromoCode)
+    storageKeyRef.current = storageKey
+    queueMicrotask(() => {
+      skipPersistRef.current = false
+    })
+  }, [authHydrated, storageKey])
+
+  useEffect(() => {
+    if (!authHydrated || skipPersistRef.current) return
+    writeStoredCart(storageKeyRef.current, { lines, appliedPromoCode })
+  }, [authHydrated, lines, appliedPromoCode])
+
+  useEffect(() => {
+    const fp = catalogFingerprint
+    if (lastCatalogFingerprintRef.current === fp) return
+    lastCatalogFingerprintRef.current = fp
+    if (products.length === 0) return
+    setLines((prev) => syncLinesWithCatalog(prev, products))
+  }, [catalogFingerprint, products])
 
   useEffect(() => {
     let cancelled = false

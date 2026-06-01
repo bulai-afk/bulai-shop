@@ -2,6 +2,19 @@
 
 Схема такая же, как у [bulai.by](https://github.com/bulai-afk/bulai.by): **GitHub Actions** собирает проект, заливает по **SSH/rsync** на `~/bulai-shop`, перезапускает **Node** на порту **3001**, а **Apache** в `public_html` проксирует запросы на Node.
 
+## Важно: какой IP использовать
+
+Для **bulai.by** в ISPmanager — IP **87.232.64.14**. В DNS A-записи домена должны указывать **на него** (и для `www`).
+
+**vh151** (**93.125.99.153**, cPanel) — другая площадка; если DNS на **87.232**, файлы на vh151 в интернете не видны.
+
+```bash
+dig +short bulai.by A
+# ожидается: 87.232.64.14
+```
+
+Деплой: SSH на **87.232.64.14** (см. `docs/DEPLOY-ISPMANAGER.md`) или файлы в `/www/bulai.by` через ISPmanager.
+
 ## 1. Один раз на сервере
 
 1. В панели hoster.by создайте приложение **Node.js** (корень `bulai-shop`, startup `start.js`, Node 20), как для `bulai`.
@@ -36,7 +49,7 @@
 
 | Секрет | Описание |
 |--------|----------|
-| `DEPLOY_HOST` | Например `vh151.hoster.by` |
+| `DEPLOY_HOST` | **`87.232.64.14`** (ISPmanager) или `vh151.hoster.by` только для cPanel |
 | `DEPLOY_USER` | SSH-пользователь (как у bulai.by) |
 | `DEPLOY_SSH_KEY` | Приватный SSH-ключ (можно тот же) |
 | `VITE_YANDEX_CLIENT_ID` | OAuth Яндекс |

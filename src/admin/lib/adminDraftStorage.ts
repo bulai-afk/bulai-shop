@@ -8,6 +8,7 @@ import {
   buildDefaultPromoMaterials,
   buildDefaultSiteConfig,
 } from '../data/siteSettingsDefaults'
+import { normalizeDictionaryValue } from '../../utils/productDictionaryValue'
 import { normalizeStockRowsFromStorage } from './stockRowUtils'
 import { createDefaultProfileExtras, type ProfileExtras } from '../../pages/ProfilePage'
 import type { AdminClientRow } from '../types/adminClients'
@@ -385,14 +386,8 @@ export function loadProductsDictionariesDraft(): ProductsDictionariesDraft {
       if (Array.isArray(input)) {
         return input.map((item, index) => {
           const maybe = item as Partial<ProductDictionaryValue>
-          return {
-            id: maybe.id ?? `${seed}-${index + 1}`,
-            value: typeof maybe.value === 'string' ? maybe.value : '',
-            color:
-              typeof maybe.color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(maybe.color)
-                ? maybe.color
-                : '',
-          }
+          const id = maybe.id ?? `${seed}-${index + 1}`
+          return normalizeDictionaryValue(maybe, id)
         })
       }
       if (typeof input === 'string') {
@@ -400,7 +395,9 @@ export function loadProductsDictionariesDraft(): ProductsDictionariesDraft {
           .split(/\r?\n|,/g)
           .map((part) => part.trim())
           .filter(Boolean)
-          .map((value, index) => ({ id: `${seed}-${index + 1}`, value, color: '' }))
+          .map((value, index) =>
+            normalizeDictionaryValue({ value }, `${seed}-${index + 1}`),
+          )
       }
       return []
     }

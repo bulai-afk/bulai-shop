@@ -15,6 +15,7 @@ import type {
   ProductDictionaryValue,
   ProductsDictionariesDraft,
 } from '../types/siteSettings'
+import { CATEGORY_DICTIONARY_ID, normalizeDictionaryValue } from '../../utils/productDictionaryValue'
 
 const inputClass =
   'block w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/50'
@@ -153,6 +154,7 @@ export function AdminProductsDictionariesPage() {
 
   const activeDictionary = draft.dictionaries.find((row) => row.id === activeDictionaryId) ?? null
   const activeValues = activeDictionary?.values ?? []
+  const isCategoryDictionary = activeDictionaryId === CATEGORY_DICTIONARY_ID
 
   const setActiveValues = (values: ProductDictionaryValue[]) => {
     if (!activeDictionary) return
@@ -162,11 +164,10 @@ export function AdminProductsDictionariesPage() {
   const addValueRow = () => {
     setActiveValues([
       ...activeValues,
-      {
-        id: `${activeDictionaryId}-value-${Date.now()}`,
-        value: '',
-        color: '',
-      },
+      normalizeDictionaryValue(
+        { value: '', color: '', imageUrl: '', catalogSlug: '' },
+        `${activeDictionaryId}-value-${Date.now()}`,
+      ),
     ])
   }
 
@@ -179,6 +180,12 @@ export function AdminProductsDictionariesPage() {
   const updateValueColor = (index: number, color: string) => {
     const next = [...activeValues]
     next[index] = { ...next[index], color }
+    setActiveValues(next)
+  }
+
+  const patchValueRow = (index: number, patch: Partial<ProductDictionaryValue>) => {
+    const next = [...activeValues]
+    next[index] = { ...next[index], ...patch }
     setActiveValues(next)
   }
 
@@ -201,7 +208,9 @@ export function AdminProductsDictionariesPage() {
         <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">Товары</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">Справочники</h1>
         <p className="mt-2 max-w-prose text-sm text-gray-400">
-          Слева кнопки справочников, справа таблица значений выбранного справочника.
+          Слева кнопки справочников, справа таблица значений выбранного справочника. Мегаменю «Мужское» в
+          шапке берёт категории из справочника <strong className="font-medium text-gray-300">Категория</strong>{' '}
+          (название, фото, slug для ссылки в каталог).
         </p>
 
         <form onSubmit={onSave} className="mt-8 flex min-h-[calc(100dvh-15rem)] flex-col gap-8">
@@ -287,77 +296,132 @@ export function AdminProductsDictionariesPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-[4rem_minmax(0,1fr)_14rem_2.5rem] gap-2 text-xs font-medium text-gray-400">
-                      <span className="text-center">№</span>
-                      <span className="text-center">Значение</span>
-                      <span className="text-center">Цвет</span>
-                      <span />
-                    </div>
-
-                    <ul className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-                      {activeValues.map((item, index) => (
-                        <li
-                          key={item.id}
-                          className="grid grid-cols-[4rem_minmax(0,1fr)_14rem_2.5rem] gap-2"
-                        >
-                          <div className="flex items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-2 py-2 text-sm text-gray-300">
-                            {String(index + 1).padStart(3, '0')}
-                          </div>
-                          <input
-                            type="text"
-                            value={item.value}
-                            onChange={(e) => updateValueRow(index, e.target.value)}
-                            className={inputClass}
-                            placeholder="Введите значение"
-                          />
-                          <div className="flex h-11 items-center gap-2">
-                            <label className="relative flex h-11 min-w-0 flex-1 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 text-sm text-gray-200 hover:border-indigo-500/40 hover:bg-indigo-950/20">
-                              <input
-                                type="color"
-                                value={/^#[0-9A-Fa-f]{6}$/.test(item.color) ? item.color : COLOR_INPUT_FALLBACK}
-                                onChange={(e) => updateValueColor(index, e.target.value)}
-                                className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-[0.015]"
-                                aria-label={`Выбрать цвет для значения ${item.value || index + 1}`}
-                              />
-                              {/^#[0-9A-Fa-f]{6}$/.test(item.color) ? (
-                                <span
-                                  aria-hidden
-                                  className="size-4 shrink-0 rounded-sm border border-white/25"
-                                  style={{ backgroundColor: item.color }}
-                                />
-                              ) : (
-                                <span
-                                  aria-hidden
-                                  className="size-4 shrink-0 rounded-sm border border-white/25 bg-white/5"
-                                />
-                              )}
-                              <span className="pointer-events-none text-xs font-medium text-gray-300">
-                                {/^#[0-9A-Fa-f]{6}$/.test(item.color)
-                                  ? item.color.toUpperCase()
-                                  : 'Задать цвет'}
-                              </span>
-                            </label>
-                            <button
-                              type="button"
-                              disabled={!/^#[0-9A-Fa-f]{6}$/.test(item.color)}
-                              onClick={() => updateValueColor(index, '')}
-                              aria-label={`Сбросить цвет для значения ${item.value || index + 1}`}
-                              className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/5 text-gray-300 transition hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+                    {isCategoryDictionary ? (
+                      <>
+                        <div className="grid grid-cols-[4rem_minmax(0,1fr)_7rem_minmax(0,1.2fr)_2.5rem] gap-2 text-xs font-medium text-gray-400">
+                          <span className="text-center">№</span>
+                          <span>Название в меню</span>
+                          <span>Slug</span>
+                          <span>Фото мегаменю (URL)</span>
+                          <span />
+                        </div>
+                        <ul className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                          {activeValues.map((item, index) => (
+                            <li
+                              key={item.id}
+                              className="grid grid-cols-[4rem_minmax(0,1fr)_7rem_minmax(0,1.2fr)_2.5rem] gap-2"
                             >
-                              <ArrowPathIcon className="size-4 shrink-0" aria-hidden />
-                            </button>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeValueRow(index)}
-                            className="size-10 rounded-md border border-white/10 p-2 text-gray-400 hover:border-rose-500/40 hover:bg-rose-950/30 hover:text-rose-200"
-                            aria-label="Удалить значение"
-                          >
-                            <TrashIcon className="size-4" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                              <div className="flex items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-2 py-2 text-sm text-gray-300">
+                                {String(index + 1).padStart(3, '0')}
+                              </div>
+                              <input
+                                type="text"
+                                value={item.value}
+                                onChange={(e) => updateValueRow(index, e.target.value)}
+                                className={inputClass}
+                                placeholder="Новинки, Майки…"
+                              />
+                              <input
+                                type="text"
+                                value={item.catalogSlug}
+                                onChange={(e) => patchValueRow(index, { catalogSlug: e.target.value })}
+                                className={inputClass}
+                                placeholder="novinki"
+                                title="Параметр ?category= в каталоге"
+                              />
+                              <input
+                                type="url"
+                                value={item.imageUrl}
+                                onChange={(e) => patchValueRow(index, { imageUrl: e.target.value })}
+                                className={inputClass}
+                                placeholder="https://…"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeValueRow(index)}
+                                className="size-10 rounded-md border border-white/10 p-2 text-gray-400 hover:border-rose-500/40 hover:bg-rose-950/30 hover:text-rose-200"
+                                aria-label="Удалить значение"
+                              >
+                                <TrashIcon className="size-4" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-[4rem_minmax(0,1fr)_14rem_2.5rem] gap-2 text-xs font-medium text-gray-400">
+                          <span className="text-center">№</span>
+                          <span className="text-center">Значение</span>
+                          <span className="text-center">Цвет</span>
+                          <span />
+                        </div>
+                        <ul className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                          {activeValues.map((item, index) => (
+                            <li
+                              key={item.id}
+                              className="grid grid-cols-[4rem_minmax(0,1fr)_14rem_2.5rem] gap-2"
+                            >
+                              <div className="flex items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-2 py-2 text-sm text-gray-300">
+                                {String(index + 1).padStart(3, '0')}
+                              </div>
+                              <input
+                                type="text"
+                                value={item.value}
+                                onChange={(e) => updateValueRow(index, e.target.value)}
+                                className={inputClass}
+                                placeholder="Введите значение"
+                              />
+                              <div className="flex h-11 items-center gap-2">
+                                <label className="relative flex h-11 min-w-0 flex-1 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 text-sm text-gray-200 hover:border-indigo-500/40 hover:bg-indigo-950/20">
+                                  <input
+                                    type="color"
+                                    value={/^#[0-9A-Fa-f]{6}$/.test(item.color) ? item.color : COLOR_INPUT_FALLBACK}
+                                    onChange={(e) => updateValueColor(index, e.target.value)}
+                                    className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-[0.015]"
+                                    aria-label={`Выбрать цвет для значения ${item.value || index + 1}`}
+                                  />
+                                  {/^#[0-9A-Fa-f]{6}$/.test(item.color) ? (
+                                    <span
+                                      aria-hidden
+                                      className="size-4 shrink-0 rounded-sm border border-white/25"
+                                      style={{ backgroundColor: item.color }}
+                                    />
+                                  ) : (
+                                    <span
+                                      aria-hidden
+                                      className="size-4 shrink-0 rounded-sm border border-white/25 bg-white/5"
+                                    />
+                                  )}
+                                  <span className="pointer-events-none text-xs font-medium text-gray-300">
+                                    {/^#[0-9A-Fa-f]{6}$/.test(item.color)
+                                      ? item.color.toUpperCase()
+                                      : 'Задать цвет'}
+                                  </span>
+                                </label>
+                                <button
+                                  type="button"
+                                  disabled={!/^#[0-9A-Fa-f]{6}$/.test(item.color)}
+                                  onClick={() => updateValueColor(index, '')}
+                                  aria-label={`Сбросить цвет для значения ${item.value || index + 1}`}
+                                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/5 text-gray-300 transition hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+                                >
+                                  <ArrowPathIcon className="size-4 shrink-0" aria-hidden />
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeValueRow(index)}
+                                className="size-10 rounded-md border border-white/10 p-2 text-gray-400 hover:border-rose-500/40 hover:bg-rose-950/30 hover:text-rose-200"
+                                aria-label="Удалить значение"
+                              >
+                                <TrashIcon className="size-4" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400">Справочников пока нет. Добавьте первый справочник.</p>

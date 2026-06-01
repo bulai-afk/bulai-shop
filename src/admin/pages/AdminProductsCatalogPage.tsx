@@ -344,6 +344,8 @@ export function AdminProductsCatalogPage() {
   )
   const [savedFlash, setSavedFlash] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
+  /** null — ещё не проверяли API; true — в БД нет снимка каталога или он пустой. */
+  const [dbCatalogEmpty, setDbCatalogEmpty] = useState<boolean | null>(null)
   const [mounted, setMounted] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [previewProductId, setPreviewProductId] = useState<string | null>(null)
@@ -400,9 +402,13 @@ export function AdminProductsCatalogPage() {
         if (inv != null) {
           saveProductsInventoryDraft(inv)
           setDraft(loadProductsInventoryDraft())
+          setDbCatalogEmpty(!Array.isArray(inv.catalog) || inv.catalog.length === 0)
+        } else if (isSiteConfigApiExpected()) {
+          setDbCatalogEmpty(true)
         }
       } catch {
         /* остаётся черновик из localStorage */
+        if (isSiteConfigApiExpected()) setDbCatalogEmpty(true)
       }
     })()
     return () => {
@@ -497,6 +503,7 @@ export function AdminProductsCatalogPage() {
         setApiError(err instanceof Error ? err.message : 'Не удалось сохранить в базу.')
         return
       }
+      setDbCatalogEmpty(draft.catalog.length === 0)
     }
     setSavedFlash(true)
     window.setTimeout(() => setSavedFlash(false), 2200)
@@ -826,6 +833,15 @@ export function AdminProductsCatalogPage() {
         <p className="mt-2 max-w-prose text-sm text-gray-400">
           Карточки товаров: SKU, название, фото, цена и характеристики из справочников.
         </p>
+        {dbCatalogEmpty && draft.catalog.length > 0 && isSiteConfigApiExpected() ? (
+          <p
+            role="status"
+            className="mt-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+          >
+            На сайте эти товары появятся только после нажатия «Сохранить» внизу страницы — сейчас витрина не видит
+            каталог в базе.
+          </p>
+        ) : null}
 
         <form onSubmit={onSave} className="mt-8 space-y-8">
           <section className={sectionClass}>

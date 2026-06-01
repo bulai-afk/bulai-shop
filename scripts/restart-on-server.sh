@@ -32,6 +32,7 @@ if [ ! -f start.js ] || [ ! -f server/dist/index.js ] || [ ! -d dist ]; then
 fi
 
 pkill -9 -u "$(whoami)" node 2>/dev/null || true
+pkill -9 -u "$(whoami)" -f next-server 2>/dev/null || true
 sleep 5
 
 export PATH="$(dirname "$NODE_BIN"):$PATH"

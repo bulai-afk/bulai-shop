@@ -16,6 +16,7 @@ import { ContactPhoneField } from '../../components/ContactPhoneField'
 import { ProfileSaveToast } from '../../components/ProfileSaveToast'
 import { SiteBrandLogo } from '../../components/SiteBrandLogo'
 import { isSiteConfigApiExpected } from '../../constants/apiBase'
+import { socialIconComponentForId } from '../../constants/socialNetworkIcons'
 import { buildDefaultSiteConfig } from '../data/siteSettingsDefaults'
 import {
   CLIENTS_UPDATED_EVENT,
@@ -54,37 +55,15 @@ const SOCIAL_OPTIONS = [
   { id: 'odnoklassniki', label: 'Одноклассники' },
 ] as const
 
-const SOCIAL_ICON_BY_ID: Record<string, string> = {
-  vk: 'simple-icons:vk',
-  telegram: 'simple-icons:telegram',
-  whatsapp: 'simple-icons:whatsapp',
-  viber: 'simple-icons:viber',
-  youtube: 'simple-icons:youtube',
-  instagram: 'simple-icons:instagram',
-  tiktok: 'simple-icons:tiktok',
-  facebook: 'simple-icons:facebook',
-  odnoklassniki: 'simple-icons:odnoklassniki',
-}
-
 function socialLabelById(id: string): string {
   const opt = SOCIAL_OPTIONS.find((item) => item.id === id)
   return opt?.label ?? id
 }
 
 function SocialNetworkIcon({ id }: { id: string }) {
-  if (id === 'max') {
-    return (
-      <img
-        src="https://maxicons.ru/icons/Max_logo.svg"
-        alt=""
-        width={16}
-        height={16}
-        aria-hidden
-        className="size-4 object-contain opacity-80"
-      />
-    )
-  }
-  return <Icon icon={SOCIAL_ICON_BY_ID[id] ?? 'mdi:link-variant'} className="size-4" aria-hidden />
+  const Comp = socialIconComponentForId(id)
+  if (Comp) return <Comp className="size-4 opacity-80" />
+  return <Icon icon="mdi:link-variant" className="size-4" aria-hidden />
 }
 
 const LOGO_ACCEPT = 'image/svg+xml,image/png,image/jpeg,image/webp,image/gif'

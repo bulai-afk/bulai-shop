@@ -9,6 +9,7 @@ import {
 import type { FormEvent, ReactNode } from 'react'
 import { ProfileSaveToast } from '../../components/ProfileSaveToast'
 import type { CatalogCategoryPromoSlug } from '../../constants/catalogCategoryPromo'
+import { AdminPromoDbSyncBanner } from '../components/AdminPromoDbSyncBanner'
 import { useAdminPromoMaterialsForm } from '../hooks/useAdminPromoMaterialsForm'
 import type { CategoryVisualPromoForm } from '../types/siteSettings'
 
@@ -96,7 +97,7 @@ function ImageSlot({
 }
 
 export function AdminPromoCatalogPage() {
-  const { promo, setPromo, mounted, save, savedFlash, setSavedFlash, apiError, setApiError } =
+  const { promo, setPromo, mounted, save, savedFlash, setSavedFlash, apiError, setApiError, dbPromoEmpty } =
     useAdminPromoMaterialsForm()
 
   const onSubmit = async (e: FormEvent) => {
@@ -146,10 +147,13 @@ export function AdminPromoCatalogPage() {
         <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">Промо материалы</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">Каталог</h1>
         <p className="mt-2 max-w-prose text-sm text-gray-400">
-          Описания и три варианта фото для каждой категории: главная, мегаменю, блок «Ключевые детали» на
-          `/catalog`. Порядок строк — порядок крупной карточки и колонки на главной (первая строка — большая
-          плитка).
+          Описания и фото для главной и блока «Ключевые детали» на `/catalog`. Фото и порядок категорий в
+          мегаменю шапки — в справочнике{' '}
+          <strong className="font-medium text-gray-300">Товары → Справочники → Категория</strong>. Порядок
+          строк здесь — порядок крупной карточки на главной (первая строка — большая плитка).
         </p>
+
+        <AdminPromoDbSyncBanner show={dbPromoEmpty} />
 
         <div className="mt-4 flex items-start gap-2 rounded-lg border border-indigo-500/20 bg-indigo-950/30 px-3 py-2.5 text-sm text-indigo-100/90">
           <InformationCircleIcon className="mt-0.5 size-5 shrink-0 text-indigo-400" aria-hidden />

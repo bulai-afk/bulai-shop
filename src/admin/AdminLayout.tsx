@@ -395,7 +395,7 @@ export function AdminLayout() {
     calendarCounts.total > 0 ? (calendarCounts.total > 99 ? '99+' : String(calendarCounts.total)) : undefined
   const calendarBadgeTitle = formatCalendarSidebarBadgeTitle(calendarCounts)
   const { user, hydrated } = useAuth()
-  const adminAllowed = useAdminAccessAllowed()
+  const { allowed: adminAllowed, checking: adminAccessChecking } = useAdminAccessAllowed()
   const { openProfileDialog, profileDialogOpen } = useProfileDialog()
   const [profileUiTick, setProfileUiTick] = useState(0)
   const prevProfileOpen = useRef(profileDialogOpen)
@@ -422,7 +422,7 @@ export function AdminLayout() {
     [user, profileUiTick],
   )
 
-  if (!hydrated) {
+  if (!hydrated || adminAccessChecking) {
     return (
       <div className="flex h-dvh items-center justify-center bg-gray-950 text-sm text-gray-400">
         Загрузка…

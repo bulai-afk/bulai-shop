@@ -10,6 +10,7 @@ const TABLES = {
   'products-dictionaries': 'products_dictionaries_snapshot',
   clients: 'admin_clients_snapshot',
   orders: 'admin_orders_snapshot',
+  reviews: 'store_reviews_snapshot',
 } as const
 
 type Segment = keyof typeof TABLES
@@ -53,6 +54,10 @@ function validateOrdersWrapper(body: unknown): body is { orders: unknown[] } {
   return body != null && typeof body === 'object' && Array.isArray((body as { orders?: unknown }).orders)
 }
 
+function validateReviewsWrapper(body: unknown): body is { reviews: unknown[] } {
+  return body != null && typeof body === 'object' && Array.isArray((body as { reviews?: unknown }).reviews)
+}
+
 function summaryForLog(segment: Segment, json: string): string {
   try {
     const o = JSON.parse(json) as Record<string, unknown>
@@ -71,6 +76,10 @@ function summaryForLog(segment: Segment, json: string): string {
     if (segment === 'orders') {
       const or = o.orders
       return `orders=${Array.isArray(or) ? or.length : 0}`
+    }
+    if (segment === 'reviews') {
+      const rv = o.reviews
+      return `reviews=${Array.isArray(rv) ? rv.length : 0}`
     }
   } catch {
     /* ignore */
@@ -114,3 +123,4 @@ registerSegment('products-inventory', validateInventory)
 registerSegment('products-dictionaries', validateDictionaries)
 registerSegment('clients', validateClientsWrapper)
 registerSegment('orders', validateOrdersWrapper)
+registerSegment('reviews', validateReviewsWrapper)

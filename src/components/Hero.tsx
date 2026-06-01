@@ -36,15 +36,33 @@ function HeroBadgePill({
   className?: string
   centered?: boolean
 }) {
+  const badgeText = hero.badgeText.trim()
+  const linkLabel = hero.badgeLinkLabel.trim()
+  const linkHref = hero.badgeLinkHref.trim()
+  if (!badgeText && !linkLabel) return null
+
   return (
     <div
       className={`relative max-w-lg rounded-full px-4 py-1 text-sm/6 text-gray-400 ring-1 ring-white/10 transition hover:ring-white/20 sm:inline-flex ${centered ? 'mx-auto justify-center' : ''} ${className}`}
     >
-      {hero.badgeText}{' '}
-      <Link to={hero.badgeLinkHref || '/catalog'} className="font-semibold text-indigo-400">
-        <span aria-hidden className="absolute inset-0" />
-        {hero.badgeLinkLabel || 'Смотреть'} <span aria-hidden="true">→</span>
-      </Link>
+      {badgeText ? (
+        <>
+          {badgeText}
+          {linkLabel ? ' ' : null}
+        </>
+      ) : null}
+      {linkLabel ? (
+        linkHref ? (
+          <Link to={linkHref} className="font-semibold text-indigo-400">
+            <span aria-hidden className="absolute inset-0" />
+            {linkLabel} <span aria-hidden="true">→</span>
+          </Link>
+        ) : (
+          <span className="font-semibold text-indigo-400">
+            {linkLabel} <span aria-hidden="true">→</span>
+          </span>
+        )
+      ) : null}
     </div>
   )
 }
@@ -88,30 +106,47 @@ function HeroCtaRow({
   /** `link` — как в split/angled (текст + стрелка); `button` — как в градиентном hero. */
   secondaryStyle?: 'button' | 'link'
 }) {
+  const primaryLabel = hero.primaryCtaLabel.trim()
+  const primaryHref = hero.primaryCtaHref.trim()
+  const secondaryLabel = hero.secondaryCtaLabel.trim()
+  const secondaryHref = hero.secondaryCtaHref.trim()
+  if (!primaryLabel && !secondaryLabel) return null
+
   const row =
     justify === 'start'
       ? 'mt-10 flex flex-wrap items-center gap-x-6 gap-y-4'
       : 'mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-4'
+
+  const primaryClass =
+    'rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500'
+  const secondaryLinkClass =
+    secondaryStyle === 'link'
+      ? 'text-sm/6 font-semibold text-white hover:text-indigo-300'
+      : 'rounded-md border border-white/20 bg-white/5 px-3.5 py-2.5 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/10'
+
   return (
     <div className={row}>
-      <Link
-        to={hero.primaryCtaHref || '/catalog'}
-        className="rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-      >
-        {hero.primaryCtaLabel || 'Посмотреть товары'}
-      </Link>
-      {hero.secondaryCtaLabel.trim() ? (
-        <Link
-          to={hero.secondaryCtaHref || '/about'}
-          className={
-            secondaryStyle === 'link'
-              ? 'text-sm/6 font-semibold text-white hover:text-indigo-300'
-              : 'rounded-md border border-white/20 bg-white/5 px-3.5 py-2.5 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/10'
-          }
-        >
-          {hero.secondaryCtaLabel}
-          {secondaryStyle === 'link' ? <span aria-hidden="true"> →</span> : null}
-        </Link>
+      {primaryLabel ? (
+        primaryHref ? (
+          <Link to={primaryHref} className={primaryClass}>
+            {primaryLabel}
+          </Link>
+        ) : (
+          <span className={primaryClass}>{primaryLabel}</span>
+        )
+      ) : null}
+      {secondaryLabel ? (
+        secondaryHref ? (
+          <Link to={secondaryHref} className={secondaryLinkClass}>
+            {secondaryLabel}
+            {secondaryStyle === 'link' ? <span aria-hidden="true"> →</span> : null}
+          </Link>
+        ) : (
+          <span className={secondaryLinkClass}>
+            {secondaryLabel}
+            {secondaryStyle === 'link' ? <span aria-hidden="true"> →</span> : null}
+          </span>
+        )
       ) : null}
     </div>
   )

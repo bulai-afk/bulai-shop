@@ -9,7 +9,6 @@ import {
   ClockIcon,
   GiftIcon,
   HeartIcon,
-  InformationCircleIcon,
   LockClosedIcon,
   MapPinIcon,
   PhotoIcon,
@@ -26,6 +25,7 @@ import { Link } from 'react-router-dom'
 import { HomeHeroPreview } from '../../components/Hero'
 import { ProfileSaveToast } from '../../components/ProfileSaveToast'
 import { createDefaultHomeHeroSlide } from '../data/siteSettingsDefaults'
+import { AdminPromoDbSyncBanner } from '../components/AdminPromoDbSyncBanner'
 import { useAdminPromoMaterialsForm } from '../hooks/useAdminPromoMaterialsForm'
 import type {
   HomeAdvantagesForm,
@@ -386,7 +386,7 @@ function HomePromoIconCardsSection({
 }
 
 export function AdminPromoHomePage() {
-  const { promo, setPromo, mounted, save, savedFlash, setSavedFlash, apiError, setApiError } =
+  const { promo, setPromo, mounted, save, savedFlash, setSavedFlash, apiError, setApiError, dbPromoEmpty } =
     useAdminPromoMaterialsForm()
   const [heroEditIndex, setHeroEditIndex] = useState<number | null>(null)
 
@@ -465,10 +465,7 @@ export function AdminPromoHomePage() {
           .
         </p>
 
-        <div className="mt-4 flex items-start gap-2 rounded-lg border border-indigo-500/20 bg-indigo-950/30 px-3 py-2.5 text-sm text-indigo-100/90">
-          <InformationCircleIcon className="mt-0.5 size-5 shrink-0 text-indigo-400" aria-hidden />
-          <p>Изменения сохраняются в черновик и на сервер (если настроен API).</p>
-        </div>
+        <AdminPromoDbSyncBanner show={dbPromoEmpty} />
 
         <form onSubmit={onSubmit} className="mt-8 space-y-8">
           <Section title="Лента" description="Сообщения в индиго-полоске над навбаром.">

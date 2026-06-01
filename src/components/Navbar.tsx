@@ -19,12 +19,9 @@ import {
   type CurrencyCode,
   useCurrency,
 } from '../context/CurrencyContext'
-import {
-  MEGA_MENU_CATEGORY_SLUG_ORDER,
-  catalogHrefForPromoSlug,
-} from '../constants/catalogCategoryPromo'
 import { useStorefrontPromoMaterials } from '../context/StorefrontSettingsContext'
-import { categoryVisualBySlug } from '../utils/categoryVisualsStorefront'
+import { useCatalogDictionaries } from '../context/CatalogDictionariesContext'
+import { buildMegaMenuTiles } from '../utils/categoryMegaMenu'
 import { profileDisplayName } from '../utils/profileDisplayName'
 import { SiteBrandLogo } from './SiteBrandLogo'
 import { useAdminAccessAllowed } from '../admin/hooks/useAdminAccessAllowed'
@@ -72,26 +69,18 @@ export function Navbar({
   const { currency, setCurrency } = useCurrency()
   const { totalCount, openCart } = useCart()
   const { user, openAuthDialog, logout } = useAuth()
-  const adminAllowed = useAdminAccessAllowed()
+  const { allowed: adminAllowed } = useAdminAccessAllowed()
   const { openProfileDialog } = useProfileDialog()
   const { openOrdersDialog } = useOrdersDialog()
   const site = useStorefrontSiteConfig()
   const { categoryVisuals } = useStorefrontPromoMaterials()
+  const dictionaries = useCatalogDictionaries()
   const siteBrand = site.brand
   const siteContact = site
 
   const megaTiles = useMemo(
-    () =>
-      MEGA_MENU_CATEGORY_SLUG_ORDER.map((slug) => {
-        const row = categoryVisualBySlug(categoryVisuals, slug)
-        return {
-          title: row?.displayName ?? slug,
-          href: catalogHrefForPromoSlug(slug),
-          img: row?.imageMegaMenu ?? '',
-          alt: row?.displayName ?? '',
-        }
-      }),
-    [categoryVisuals],
+    () => buildMegaMenuTiles(dictionaries, categoryVisuals),
+    [dictionaries, categoryVisuals],
   )
   const location = useLocation()
   const headerRef = useRef<HTMLElement>(null)

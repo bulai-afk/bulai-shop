@@ -57,7 +57,7 @@ function hideProfileFlyout() {
 export function DeliveryPromoBar() {
   const { currency, setCurrency } = useCurrency()
   const { user, openAuthDialog, logout } = useAuth()
-  const adminAllowed = useAdminAccessAllowed()
+  const { allowed: adminAllowed } = useAdminAccessAllowed()
   const { openProfileDialog } = useProfileDialog()
   const { openOrdersDialog } = useOrdersDialog()
   const promo = useStorefrontPromoMaterials()

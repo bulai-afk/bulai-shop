@@ -525,6 +525,7 @@ export function ProductPage() {
       ) : null}
 
       <ProductGalleryReviews
+        productId={product.id}
         productRating={product.rating}
         reviewCount={product.reviews}
         productPreview={{

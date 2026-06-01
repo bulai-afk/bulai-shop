@@ -11,6 +11,8 @@ export function useAdminPromoMaterialsForm() {
   const [mounted, setMounted] = useState(false)
   const [savedFlash, setSavedFlash] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
+  /** В БД ещё нет снимка промо (витрина показывает дефолты). */
+  const [dbPromoEmpty, setDbPromoEmpty] = useState<boolean | null>(null)
 
   useEffect(() => {
     setPromo(mergePromoMaterialsForm(loadPromoMaterialsDraft()))
@@ -23,12 +25,17 @@ export function useAdminPromoMaterialsForm() {
     ;(async () => {
       try {
         const remote = await fetchPromoMaterialsFromApi()
-        if (cancelled || remote == null) return
+        if (cancelled) return
+        if (remote == null) {
+          setDbPromoEmpty(true)
+          return
+        }
+        setDbPromoEmpty(false)
         const merged = mergePromoMaterialsForm(remote)
         savePromoMaterialsDraft(merged)
         setPromo(merged)
       } catch {
-        /* черновик из localStorage */
+        if (!cancelled) setDbPromoEmpty(true)
       }
     })()
     return () => {
@@ -44,6 +51,7 @@ export function useAdminPromoMaterialsForm() {
       if (isSiteConfigApiExpected()) {
         try {
           await putPromoMaterialsToApi(promo)
+          setDbPromoEmpty(false)
         } catch (err) {
           setApiError(err instanceof Error ? err.message : 'Не удалось сохранить в базу.')
           return false
@@ -56,5 +64,15 @@ export function useAdminPromoMaterialsForm() {
     [promo],
   )
 
-  return { promo, setPromo, mounted, save, savedFlash, setSavedFlash, apiError, setApiError }
+  return {
+    promo,
+    setPromo,
+    mounted,
+    save,
+    savedFlash,
+    setSavedFlash,
+    apiError,
+    setApiError,
+    dbPromoEmpty: dbPromoEmpty === true,
+  }
 }

@@ -1,9 +1,11 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { PanelScrollArea } from './PanelScrollArea'
-import { WriteReviewDialog, type WriteReviewProductPreview } from './WriteReviewDialog'
+import { postProductReview } from '../api/reviewsApi'
+import { useAuth } from '../context/AuthContext'
 import { useMainScrollbarSuppression } from '../context/MainScrollbarSuppressionContext'
-import { MOCK_CATALOG_REVIEWS } from '../data/mockCatalogReviews'
+import { useProductReviews, notifyReviewsUpdated } from '../hooks/useProductReviews'
 import { getPageScrollElement } from '../utils/getPageScrollElement'
+import { WriteReviewDialog, type WriteReviewProductPreview } from './WriteReviewDialog'
 
 function classNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ')
@@ -12,12 +14,18 @@ function classNames(...classes: Array<string | false | null | undefined>) {
 const PAGE_SCROLL_BOTTOM_SLACK_PX = 4
 
 type Props = {
+  productId: string
   productRating: number
   reviewCount: number
   productPreview?: WriteReviewProductPreview | null
 }
 
-export function ProductGalleryReviews({ productRating, reviewCount, productPreview }: Props) {
+export function ProductGalleryReviews({
+  productId,
+  productRating,
+  reviewCount,
+  productPreview,
+}: Props) {
   const headingId = useId().replace(/:/g, '')
   const [reviewStarsFilter, setReviewStarsFilter] = useState<number | null>(null)
   const reviewsSidebarRef = useRef<HTMLDivElement>(null)
@@ -25,8 +33,13 @@ export function ProductGalleryReviews({ productRating, reviewCount, productPrevi
   const [pageScrollAtBottom, setPageScrollAtBottom] = useState(false)
   const { setHideMainScrollbarForCatalogBottom } = useMainScrollbarSuppression()
   const [writeReviewOpen, setWriteReviewOpen] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const { isAuthenticated, openAuthDialog } = useAuth()
+  const { reviews: recentReviews, productRating: apiRating, reviewCount: apiCount, reload } =
+    useProductReviews(productId)
 
-  const recentReviews = MOCK_CATALOG_REVIEWS
+  const displayRating = apiRating ?? productRating
+  const displayCount = apiCount ?? reviewCount
   const total = recentReviews.length
 
   const countByStar = recentReviews.reduce<Record<number, number>>((acc, r) => {
@@ -46,7 +59,7 @@ export function ProductGalleryReviews({ productRating, reviewCount, productPrevi
       ? recentReviews
       : recentReviews.filter((review) => review.rating === reviewStarsFilter)
 
-  const roundedSummary = Math.round(productRating * 2) / 2
+  const roundedSummary = Math.round(displayRating * 2) / 2
 
   const reviewsListExtraPx = 28
   const reviewsListHeightPx =
@@ -122,7 +135,7 @@ export function ProductGalleryReviews({ productRating, reviewCount, productPrevi
                 <div>
                   <div
                     className="flex items-center"
-                    aria-label={`Рейтинг ${productRating.toFixed(1)} из 5`}
+                    aria-label={`Рейтинг ${displayRating.toFixed(1)} из 5`}
                   >
                     {[1, 2, 3, 4, 5].map((star) => {
                       const isFull = roundedSummary >= star
@@ -152,11 +165,11 @@ export function ProductGalleryReviews({ productRating, reviewCount, productPrevi
                       )
                     })}
                   </div>
-                  <p className="sr-only">{productRating.toFixed(1)} из 5</p>
+                  <p className="sr-only">{displayRating.toFixed(1)} из 5</p>
                 </div>
-                <p className="ml-3 text-sm font-semibold text-white">{productRating.toFixed(1)}</p>
+                <p className="ml-3 text-sm font-semibold text-white">{displayRating.toFixed(1)}</p>
                 <p className="ml-4 text-sm text-white">
-                  На основе {reviewCount.toLocaleString('ru-RU')} отзывов
+                  На основе {displayCount.toLocaleString('ru-RU')} отзывов
                 </p>
               </div>
 
@@ -233,9 +246,17 @@ export function ProductGalleryReviews({ productRating, reviewCount, productPrevi
                 <p className="mt-1 text-sm text-gray-300">
                   Если вы покупали у нас, оставьте отзыв — это помогает другим выбрать.
                 </p>
+                {submitError ? <p className="mt-3 text-sm text-red-400">{submitError}</p> : null}
                 <button
                   type="button"
-                  onClick={() => setWriteReviewOpen(true)}
+                  onClick={() => {
+                    setSubmitError(null)
+                    if (!isAuthenticated) {
+                      openAuthDialog({ mode: 'signin' })
+                      return
+                    }
+                    setWriteReviewOpen(true)
+                  }}
                   className="mt-6 w-full rounded-lg bg-slate-700/65 px-4 py-2.5 text-center text-sm font-semibold text-gray-100 transition hover:bg-slate-600/75"
                 >
                   Написать отзыв
@@ -257,8 +278,13 @@ export function ProductGalleryReviews({ productRating, reviewCount, productPrevi
 
                 <div className="flow-root">
                   <div className="-my-6 divide-y divide-white/10">
+                    {filteredRecentReviews.length === 0 ? (
+                      <p className="py-8 text-center text-sm text-gray-400">
+                        Пока нет отзывов об этом товаре. Будьте первым.
+                      </p>
+                    ) : null}
                     {filteredRecentReviews.map((review) => (
-                      <div key={review.name} className="py-6">
+                      <div key={review.id} className="py-6">
                         <div className="flex items-center">
                           <img
                             src={review.avatar}
@@ -299,6 +325,16 @@ export function ProductGalleryReviews({ productRating, reviewCount, productPrevi
         open={writeReviewOpen}
         onClose={() => setWriteReviewOpen(false)}
         productPreview={productPreview}
+        onSubmit={async (payload) => {
+          setSubmitError(null)
+          try {
+            await postProductReview(productId, payload)
+            notifyReviewsUpdated()
+            await reload()
+          } catch {
+            setSubmitError('Не удалось отправить отзыв. Войдите в аккаунт и попробуйте снова.')
+          }
+        }}
       />
     </section>
   )

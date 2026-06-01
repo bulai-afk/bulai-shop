@@ -42,7 +42,7 @@ jobs:
       - name: Create archives
         run: |
           COPYFILE_DISABLE=1 tar -czf dist.tar.gz dist
-          COPYFILE_DISABLE=1 tar -czf server.tar.gz -C server dist node_modules package.json package-lock.json
+          COPYFILE_DISABLE=1 tar -czf server.tar.gz -C server dist node_modules package.json package-lock.json migrate.ts migrations
           tar -tzf dist.tar.gz > /dev/null
           tar -tzf server.tar.gz > /dev/null
 
@@ -74,7 +74,7 @@ jobs:
           ssh $SSH_OPTS ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p ${REMOTE}/scripts ${REMOTE}/tmp"
           echo "DIST_SIZE=$(stat -c %s dist.tar.gz)" >> $GITHUB_ENV
           echo "SERVER_SIZE=$(stat -c %s server.tar.gz)" >> $GITHUB_ENV
-          rsync -avz -e "ssh $SSH_OPTS" dist.tar.gz server.tar.gz start.js \
+          rsync -avz -e "ssh $SSH_OPTS" dist.tar.gz server.tar.gz start.js package.json \
             ${DEPLOY_USER}@${DEPLOY_HOST}:${REMOTE}/
           rsync -avz -e "ssh $SSH_OPTS" scripts/deploy-remote.sh scripts/restart-on-server.sh \
             ${DEPLOY_USER}@${DEPLOY_HOST}:${REMOTE}/scripts/
