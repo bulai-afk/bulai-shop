@@ -5,7 +5,7 @@ import { resolveStorefrontBuyerEmail } from '../utils/sessionEmail'
 import { isSiteConfigApiExpected } from '../constants/apiBase'
 import { resolveClientIdForEmail } from '../lib/createOrderFromCheckout'
 import type { StorefrontOrder } from '../types/storefrontOrder'
-import { adminOrdersToStorefrontOrders } from '../utils/orderStorefrontMapping'
+import { adminOrdersToStorefrontOrders, mergeStorefrontOrders } from '../utils/orderStorefrontMapping'
 
 function loadLocalStorefrontOrders(email: string): StorefrontOrder[] {
   const clients = loadClientsDraft()
@@ -19,17 +19,6 @@ function normalizeApiOrder(row: StorefrontOrder): StorefrontOrder {
     ...row,
     lines: Array.isArray(row.lines) ? row.lines : [],
   }
-}
-
-function mergeOrders(remote: StorefrontOrder[], local: StorefrontOrder[]): StorefrontOrder[] {
-  const byKey = new Map<string, StorefrontOrder>()
-  for (const o of local) {
-    byKey.set(o.id ?? o.orderNumber, o)
-  }
-  for (const o of remote) {
-    byKey.set(o.id ?? o.orderNumber, o)
-  }
-  return [...byKey.values()].sort((a, b) => b.placedIso.localeCompare(a.placedIso))
 }
 
 export function useMyStorefrontOrders(sessionJwt: string | null, userEmail: string | undefined) {
@@ -63,7 +52,7 @@ export function useMyStorefrontOrders(sessionJwt: string | null, userEmail: stri
 
     try {
       const remote = (await fetchMyStorefrontOrders(sessionJwt!)).map(normalizeApiOrder)
-      const merged = mergeOrders(remote, local)
+      const merged = mergeStorefrontOrders(remote, local)
       setOrders(merged.length > 0 ? merged : local)
       setAuthError(false)
       setSyncError(false)

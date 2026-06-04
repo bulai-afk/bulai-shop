@@ -75,7 +75,11 @@ export async function submitCheckoutOrder(params: SubmitCheckoutParams): Promise
       existing,
     )
     order.orderNumber = res.orderNumber
-    saveOrdersDraft([...existing, order])
+    const num = res.orderNumber.trim()
+    const withoutDup = num
+      ? existing.filter((o) => o.orderNumber.trim().toLowerCase() !== num.toLowerCase())
+      : existing
+    saveOrdersDraft([...withoutDup, order])
     window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT))
     return { orderNumber: res.orderNumber, usedApi: true }
   }

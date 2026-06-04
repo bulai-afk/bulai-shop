@@ -116,6 +116,36 @@ export function adminOrderToStorefrontOrder(
   }
 }
 
+/** Ключ слияния local + API: один номер заказа — одна карточка (id на сервере и в черновике могут различаться). */
+export function storefrontOrderMergeKey(o: Pick<StorefrontOrder, 'id' | 'orderNumber'>): string {
+  const num = o.orderNumber?.trim()
+  if (num) return `n:${num.toLowerCase()}`
+  const id = o.id?.trim()
+  if (id) return `i:${id}`
+  return `u:unknown`
+}
+
+export function mergeStorefrontOrders(remote: StorefrontOrder[], local: StorefrontOrder[]): StorefrontOrder[] {
+  const byKey = new Map<string, StorefrontOrder>()
+  for (const o of local) {
+    byKey.set(storefrontOrderMergeKey(o), o)
+  }
+  for (const o of remote) {
+    const key = storefrontOrderMergeKey(o)
+    const prev = byKey.get(key)
+    if (!prev) {
+      byKey.set(key, o)
+      continue
+    }
+    byKey.set(key, {
+      ...prev,
+      ...o,
+      lines: o.lines.length > 0 ? o.lines : prev.lines,
+    })
+  }
+  return [...byKey.values()].sort((a, b) => b.placedIso.localeCompare(a.placedIso))
+}
+
 export function adminOrdersToStorefrontOrders(
   orders: AdminOrderRow[],
   clientEmail: string,
