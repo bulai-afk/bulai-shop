@@ -21,6 +21,7 @@ export type SiteConfigJson = {
     shopNameLine: string
   }
   adminAccessClientIds: string[]
+  yandexOAuthClientId: string
 }
 
 function defaultConfig(): SiteConfigJson {
@@ -48,6 +49,7 @@ function defaultConfig(): SiteConfigJson {
       shopNameLine: `© ${year} Интернет-магазин bulai.by`,
     },
     adminAccessClientIds: [],
+    yandexOAuthClientId: '',
   }
 }
 
@@ -66,5 +68,9 @@ export function normalizeSiteConfig(input: unknown): SiteConfigJson {
     adminAccessClientIds: Array.isArray(raw.adminAccessClientIds)
       ? raw.adminAccessClientIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
       : base.adminAccessClientIds,
+    yandexOAuthClientId:
+      typeof raw.yandexOAuthClientId === 'string'
+        ? raw.yandexOAuthClientId.trim()
+        : base.yandexOAuthClientId,
   }
 }

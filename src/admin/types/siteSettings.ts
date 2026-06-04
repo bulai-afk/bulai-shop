@@ -41,6 +41,8 @@ export type SiteConfigForm = {
    * Пустой список — доступ не ограничен (как раньше). Непустой — только совпадение по почте или телефону с карточкой клиента.
    */
   adminAccessClientIds: string[]
+  /** Публичный OAuth client_id Яндекс ID для кнопки входа на витрине (из oauth.yandex.ru). */
+  yandexOAuthClientId: string
 }
 
 /** Иконки блока «Почему мы» на главной (Heroicons). */

@@ -17,5 +17,7 @@ export function mergeSiteConfigForm(p: unknown): SiteConfigForm {
     adminAccessClientIds: Array.isArray(raw.adminAccessClientIds)
       ? raw.adminAccessClientIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
       : base.adminAccessClientIds,
+    yandexOAuthClientId:
+      typeof raw.yandexOAuthClientId === 'string' ? raw.yandexOAuthClientId.trim() : base.yandexOAuthClientId,
   }
 }

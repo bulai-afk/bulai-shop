@@ -5,6 +5,7 @@ import {
   emailFromYandexInfoServer,
   fetchYandexLoginInfoServer,
 } from '../lib/yandexLoginInfoServer.js'
+import { resolveYandexOAuthClientId } from '../lib/yandexOAuthConfig.js'
 
 export const authSessionRouter = Router()
 
@@ -16,11 +17,15 @@ function yandexRedirectUriFromRequest(req: Request): string {
   return `${proto}://${host}/auth/yandex/callback`
 }
 
-/** GET /api/auth/yandex-config — публичный client_id (если не зашит в Vite при сборке). */
-authSessionRouter.get('/yandex-config', (req, res) => {
-  const clientId = config.yandexOAuthClientId || null
-  const redirectUri = clientId ? yandexRedirectUriFromRequest(req) || null : null
-  res.json({ clientId, redirectUri })
+/** GET /api/auth/yandex-config — публичный client_id (env, site_config или Vite при сборке). */
+authSessionRouter.get('/yandex-config', async (req, res, next) => {
+  try {
+    const clientId = (await resolveYandexOAuthClientId()) || null
+    const redirectUri = clientId ? yandexRedirectUriFromRequest(req) || null : null
+    res.json({ clientId, redirectUri })
+  } catch (e) {
+    next(e)
+  }
 })
 
 /**

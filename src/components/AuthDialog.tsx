@@ -108,9 +108,14 @@ export function AuthDialog() {
                   />
                 </div>
               </section>
-            ) : authDialogOpen && yandexConfigReady && !hasYandex && import.meta.env.DEV ? (
+            ) : authDialogOpen && !yandexConfigReady ? (
+              <p className="text-center text-sm text-gray-500">Загрузка входа через Яндекс…</p>
+            ) : authDialogOpen && yandexConfigReady && !hasYandex ? (
               <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-center text-xs text-amber-200/90">
-                Яндекс ID: задайте VITE_YANDEX_CLIENT_ID в .env или YANDEX_OAUTH_CLIENT_ID в server/.env
+                Вход через Яндекс не настроен. Укажите OAuth Client ID в админке: Настройки сайта → Яндекс ID
+                {import.meta.env.DEV
+                  ? ', либо VITE_YANDEX_CLIENT_ID / YANDEX_OAUTH_CLIENT_ID в .env.'
+                  : ' (или YANDEX_OAUTH_CLIENT_ID на сервере).'}
               </p>
             ) : null}
 

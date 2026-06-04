@@ -848,6 +848,31 @@ export function AdminSiteSettingsPage() {
           </Section>
 
           <Section
+            title="Яндекс ID"
+            description="Публичный Client ID из кабинета oauth.yandex.ru — для кнопки «Войти через Яндекс» в окне входа на витрине. Redirect URI: https://ваш-домен/auth/yandex/callback"
+          >
+            <div>
+              <label className={labelClass} htmlFor="yandex-oauth-client-id">
+                OAuth Client ID
+              </label>
+              <p className={`mt-0.5 ${hintClass}`}>
+                Сохраните и обновите витрину — пересборка фронта не нужна. Можно дублировать значение в
+                YANDEX_OAUTH_CLIENT_ID на сервере.
+              </p>
+              <input
+                id="yandex-oauth-client-id"
+                type="text"
+                value={sc.yandexOAuthClientId}
+                onChange={(e) => setSite({ yandexOAuthClientId: e.target.value.trim() })}
+                className={inputClass}
+                placeholder="Например: a1b2c3d4e5f6g7h8i9j0"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+          </Section>
+
+          <Section
             title="Права доступа"
             description="Пользователи из базы клиентов, которым разрешён вход в админ-панель. Совпадение проверяется по электронной почте или номеру телефона с карточкой клиента. Пока список пуст — вход в админку закрыт для всех."
           >

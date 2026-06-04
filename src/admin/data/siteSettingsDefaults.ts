@@ -48,6 +48,7 @@ export function buildDefaultSiteConfig(): SiteConfigForm {
       shopNameLine: `© ${year} Интернет-магазин bulai.by`,
     },
     adminAccessClientIds: [],
+    yandexOAuthClientId: '',
   }
 }
 
