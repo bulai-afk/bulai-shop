@@ -143,6 +143,10 @@ export type AdminOrderRow = {
   /** Дата отправки заказа / передачи в доставку (YYYY-MM-DD) */
   shippingDate?: string
   customerName: string
+  /** Карточка клиента в админке (покупатель = пользователь витрины). */
+  clientId?: string
+  /** Нормализованный email для фильтра «мои заказы» (`JWT sub`). */
+  clientEmail?: string
   /** Сумма строкой, например «12 500 ₽» */
   total: string
   status: string

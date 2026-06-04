@@ -20,6 +20,7 @@ import {
   type OrderPaymentMethodId,
   type OrderStageId,
 } from '../types/adminOrders'
+import { findClientForOrder, orderClientLinkPatch } from '../../utils/clientOrderLink'
 
 const inputClass =
   'block w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/50'
@@ -32,22 +33,6 @@ const listboxOptionClass =
 
 /** Страны — как в форме профиля на сайте */
 const PROFILE_COUNTRY_OPTIONS = ['Россия', 'Беларусь', 'Казахстан', 'США', 'Канада', 'Мексика'] as const
-
-function normalizeComparableName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, ' ')
-}
-
-function clientListDisplayName(c: AdminClientRow): string {
-  return [c.firstName, c.lastName].filter(Boolean).join(' ').trim()
-}
-
-function clientListDisplayNameReversed(c: AdminClientRow): string {
-  return [c.lastName, c.firstName].filter(Boolean).join(' ').trim()
-}
-
-function normalizePhoneDigits(s: string): string {
-  return s.replace(/\D/g, '')
-}
 
 function clientRowToProfileExtras(row: AdminClientRow): ProfileExtras {
   return profileExtrasFromClientTableRow(row)
@@ -67,26 +52,6 @@ function patchClientProfile(row: AdminClientRow, patch: Partial<ProfileExtras>):
       ...patch,
     },
   }
-}
-
-function findClientForOrderCustomerName(
-  customerName: string,
-  clients: AdminClientRow[],
-): AdminClientRow | undefined {
-  const raw = customerName.trim()
-  if (!raw) return undefined
-  const n = normalizeComparableName(raw)
-  const digits = normalizePhoneDigits(raw)
-  for (const c of clients) {
-    const full = normalizeComparableName(clientListDisplayName(c))
-    const rev = normalizeComparableName(clientListDisplayNameReversed(c))
-    if (full && n === full) return c
-    if (rev && n === rev) return c
-    const em = c.email?.trim().toLowerCase()
-    if (em && n === em) return c
-    if (digits.length >= 7 && normalizePhoneDigits(c.phone) === digits) return c
-  }
-  return undefined
 }
 
 function PaymentMethodSelect({
@@ -328,7 +293,7 @@ export function AdminOrderPreviewDialog({
 
   const previewMatchedClient = useMemo(() => {
     if (!previewOrder) return undefined
-    return findClientForOrderCustomerName(previewOrder.customerName, clients)
+    return findClientForOrder(previewOrder, clients)
   }, [previewOrder, clients])
 
   const previewAddressProfile = useMemo(() => {
@@ -456,10 +421,10 @@ export function AdminOrderPreviewDialog({
                               const firstName = e.target.value
                               updateClientProfile(previewMatchedClient.id, { firstName })
                               updateRow(previewOrder.id, {
-                                customerName: [previewMatchedClient.lastName, firstName]
-                                  .filter(Boolean)
-                                  .join(' ')
-                                  .trim(),
+                                ...orderClientLinkPatch({
+                                  ...previewMatchedClient,
+                                  firstName,
+                                }),
                               })
                             }}
                             className={`${inputClass} mt-1`}
@@ -475,10 +440,10 @@ export function AdminOrderPreviewDialog({
                               const lastName = e.target.value
                               updateClientProfile(previewMatchedClient.id, { lastName })
                               updateRow(previewOrder.id, {
-                                customerName: [lastName, previewMatchedClient.firstName]
-                                  .filter(Boolean)
-                                  .join(' ')
-                                  .trim(),
+                                ...orderClientLinkPatch({
+                                  ...previewMatchedClient,
+                                  lastName,
+                                }),
                               })
                             }}
                             className={`${inputClass} mt-1`}

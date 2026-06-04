@@ -10,6 +10,7 @@ import { formatCartAmount, useCart, type CartLine } from '../context/CartContext
 import { MoneyWithGlyph } from '../components/MoneyWithGlyph'
 import { checkoutEmailFieldError, contactEmailError } from '../lib/contactEmail'
 import { formatPhoneForSummaryLine, isCompleteStoredPhoneDigits } from '../lib/contactPhoneInputDisplay'
+import { submitCheckoutOrder } from '../lib/checkoutSubmit'
 
 function lineSaleTotalRub(line: CartLine): number {
   const unit = parseInt(line.priceDisplay.replace(/\D/g, ''), 10) || 0
@@ -90,7 +91,7 @@ function StepAccordionHeader({
 
 export function CheckoutPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, openAuthDialog, user } = useAuth()
+  const { isAuthenticated, openAuthDialog, user, sessionJwt } = useAuth()
   const {
     lines,
     removeLine,
@@ -108,6 +109,9 @@ export function CheckoutPage() {
 
   const promoInputId = useId()
   const [thankYouOpen, setThankYouOpen] = useState(false)
+  const [createdOrderNumber, setCreatedOrderNumber] = useState<string | null>(null)
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [promoCode, setPromoCode] = useState('')
   const [promoHint, setPromoHint] = useState<'error' | null>(null)
 
@@ -193,14 +197,42 @@ export function CheckoutPage() {
     setOpenStep(3)
   }
 
-  const handlePay = () => {
-    if (!paymentMethod) return
-    setThankYouOpen(true)
+  const handlePay = async () => {
+    if (!paymentMethod || checkoutSubmitting) return
+    if (!isAuthenticated || !user) {
+      openAuthDialog()
+      return
+    }
+    if (!step1Valid || !step2Valid) return
+    setCheckoutError(null)
+    setCheckoutSubmitting(true)
+    try {
+      const result = await submitCheckoutOrder({
+        sessionJwt,
+        userEmail: user.email,
+        firstName,
+        lastName,
+        phone: formatPhoneForSummaryLine(phoneTel) || phoneTel,
+        termsAccepted: terms,
+        deliveryMethodLabel: deliveryMethod ? deliveryMethodLabel(deliveryMethod) : '',
+        paymentMethod,
+        lines,
+        appliedPromoCode,
+        appliedPromoPercent,
+      })
+      setCreatedOrderNumber(result.orderNumber)
+      setThankYouOpen(true)
+    } catch {
+      setCheckoutError('Не удалось оформить заказ. Проверьте подключение и попробуйте снова.')
+    } finally {
+      setCheckoutSubmitting(false)
+    }
   }
 
   const finishThankYou = () => {
     clearCart()
     setThankYouOpen(false)
+    setCreatedOrderNumber(null)
     navigate('/catalog', { replace: true })
   }
 
@@ -712,13 +744,18 @@ export function CheckoutPage() {
                             Наличными при получении
                           </button>
                         </div>
+                        {checkoutError ? (
+                          <p className="text-xs text-red-400" role="alert">
+                            {checkoutError}
+                          </p>
+                        ) : null}
                         <button
                           type="button"
-                          onClick={handlePay}
-                          disabled={!paymentMethod}
+                          onClick={() => void handlePay()}
+                          disabled={!paymentMethod || checkoutSubmitting}
                           className="w-full rounded-md bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          Оплатить
+                          {checkoutSubmitting ? 'Оформляем…' : 'Оплатить'}
                         </button>
                       </div>
                     </div>
@@ -749,6 +786,13 @@ export function CheckoutPage() {
               </DialogTitle>
               <p className="mt-3 text-sm leading-6 text-gray-300">
                 Искренне рады, что выбрали нас!
+                {createdOrderNumber ? (
+                  <>
+                    {' '}
+                    Номер заказа:{' '}
+                    <span className="font-medium text-white tabular-nums">{createdOrderNumber}</span>.
+                  </>
+                ) : null}
               </p>
               <button
                 type="button"

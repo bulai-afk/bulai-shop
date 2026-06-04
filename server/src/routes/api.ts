@@ -7,6 +7,8 @@ import { promoMaterialsRouter } from './promoMaterials.js'
 import { authSessionRouter } from './authSession.js'
 import { siteConfigRouter } from './siteConfig.js'
 import { storefrontClientProfileRouter } from './storefrontClientProfile.js'
+import { storefrontMeRouter } from './storefrontMe.js'
+import { checkoutRouter } from './checkout.js'
 import { exchangeRatesRouter } from './exchangeRates.js'
 import { productReviewsRouter, reviewsRouter } from './reviews.js'
 
@@ -24,6 +26,8 @@ apiRouter.use('/promo-codes', promoCodesCatalogRouter)
 apiRouter.use('/admin/data', adminDataRouter)
 apiRouter.use('/auth', authSessionRouter)
 apiRouter.use('/profile', storefrontClientProfileRouter)
+apiRouter.use('/me', storefrontMeRouter)
+apiRouter.use('/checkout', checkoutRouter)
 apiRouter.use('/reviews', reviewsRouter)
 apiRouter.use('/products', productReviewsRouter)
 

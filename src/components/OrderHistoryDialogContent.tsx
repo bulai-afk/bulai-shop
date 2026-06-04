@@ -1,143 +1,31 @@
 import { CheckCircleIcon } from '@heroicons/react/24/solid'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useCatalogInventory } from '../context/CatalogInventoryContext'
+import type { Product } from '../data/catalogProducts'
+import { useMyStorefrontOrders } from '../hooks/useMyStorefrontOrders'
+import type { StorefrontOrder, StorefrontOrderLine } from '../types/storefrontOrder'
 import { formatDateRuFromIso } from '../utils/formatDateRu'
+import { tailwindSwatchClassToHex } from '../utils/orderStorefrontMapping'
 
-type OrderLine = {
-  id: string
-  name: string
-  /** Цена за единицу до скидки. */
-  priceRub: number
-  quantity: number
-  /** Скидка на позицию (на все количество). */
-  lineDiscountRub: number
-  /** Итоговая цена позиции после скидки. */
-  lineTotalRub: number
-  color: string
-  /** Заливка кружка-образца (например #hex). */
-  colorSwatch: string
-  size: string
-  imageSrc: string
-  imageAlt: string
-  productHref: string
+function enrichOrderLines(order: StorefrontOrder, catalogProducts: Product[]): StorefrontOrder {
+  const byId = Object.fromEntries(catalogProducts.map((p) => [p.id, p]))
+  const lines: StorefrontOrderLine[] = order.lines.map((line) => {
+    const m = /\/product\/([^/]+)/.exec(line.productHref)
+    const productId = m?.[1]
+    const product = productId ? byId[productId] : undefined
+    if (!product) return line
+    const swatch = product.colors.find((c) => c.name === line.color) ?? product.colors[0]
+    return {
+      ...line,
+      imageSrc: swatch?.image ?? product.image,
+      imageAlt: `${product.name}, цвет ${swatch?.name ?? line.color}`,
+      colorSwatch: tailwindSwatchClassToHex(swatch?.className),
+    }
+  })
+  return { ...order, lines }
 }
-
-type Order = {
-  orderNumber: string
-  /** Дата оформления `YYYY-MM-DD`; на экране — ДД.ММ.ГГГГ. */
-  placedIso: string
-  /** Сумма по каталогу до скидок. */
-  subtotalRub: number
-  /** Скидка по заказу. */
-  orderDiscountRub: number
-  /** Итого к оплате. */
-  totalRub: number
-  /** Например «Доставлено 24.03.2026» или «Доставка 23.03.2026». */
-  orderStatusText: string
-  /** Зелёная галочка только при доставленном заказе. */
-  orderDelivered: boolean
-  lines: OrderLine[]
-}
-
-const MOCK_ORDERS: Order[] = [
-  {
-    orderNumber: 'WU88191111',
-    placedIso: '2021-01-22',
-    subtotalRub: 26_600,
-    orderDiscountRub: 2800,
-    totalRub: 23_800,
-    orderStatusText: 'Доставлено 23.04.2026',
-    orderDelivered: true,
-    lines: [
-      {
-        id: 'l1',
-        name: 'Набор ручки и карандаша',
-        priceRub: 7000,
-        quantity: 1,
-        lineDiscountRub: 700,
-        lineTotalRub: 6300,
-        color: 'Графит и хром',
-        colorSwatch: '#52525b',
-        size: 'XL',
-        imageSrc:
-          'https://tailwindcss.com/plus-assets/img/ecommerce-images/order-history-page-02-product-01.jpg',
-        imageAlt: 'Деталь наконечника механического карандаша.',
-        productHref: '/catalog',
-      },
-      {
-        id: 'l2',
-        name: 'Керамическая кружка',
-        priceRub: 2800,
-        quantity: 2,
-        lineDiscountRub: 1400,
-        lineTotalRub: 4200,
-        color: 'Туманно-серый',
-        colorSwatch: '#94a3b8',
-        size: 'L',
-        imageSrc:
-          'https://tailwindcss.com/plus-assets/img/ecommerce-images/order-history-page-02-product-02.jpg',
-        imageAlt: 'Керамическая кружка с ручкой.',
-        productHref: '/catalog',
-      },
-      {
-        id: 'l3',
-        name: 'Набор ежедневников в коже',
-        priceRub: 14_000,
-        quantity: 1,
-        lineDiscountRub: 700,
-        lineTotalRub: 13_300,
-        color: 'Коньяк',
-        colorSwatch: '#78350f',
-        size: 'XXL',
-        imageSrc:
-          'https://tailwindcss.com/plus-assets/img/ecommerce-images/order-history-page-02-product-03.jpg',
-        imageAlt: 'Ежедневник в кожаной обложке.',
-        productHref: '/catalog',
-      },
-    ],
-  },
-  {
-    orderNumber: 'WU88191009',
-    placedIso: '2021-01-05',
-    subtotalRub: 18_500,
-    orderDiscountRub: 7000,
-    totalRub: 11_500,
-    orderStatusText: 'Доставка 23.03.2026',
-    orderDelivered: false,
-    lines: [
-      {
-        id: 'l4',
-        name: 'Сумка-клатч',
-        priceRub: 8000,
-        quantity: 1,
-        lineDiscountRub: 500,
-        lineTotalRub: 7500,
-        color: 'Натуральный лён',
-        colorSwatch: '#c4b5a0',
-        size: 'L',
-        imageSrc:
-          'https://tailwindcss.com/plus-assets/img/ecommerce-images/order-history-page-02-product-04.jpg',
-        imageAlt: 'Текстильный клатч на молнии.',
-        productHref: '/catalog',
-      },
-      {
-        id: 'l5',
-        name: 'Термокружка Nomad',
-        priceRub: 3500,
-        quantity: 3,
-        lineDiscountRub: 6500,
-        lineTotalRub: 4000,
-        color: 'Чёрный матовый',
-        colorSwatch: '#262626',
-        size: 'XL',
-        imageSrc:
-          'https://tailwindcss.com/plus-assets/img/ecommerce-images/order-history-page-02-product-05.jpg',
-        imageAlt: 'Чёрная термокружка.',
-        productHref: '/catalog',
-      },
-    ],
-  },
-]
 
 function formatRub(amount: number) {
   return `${amount.toLocaleString('ru-RU')} ₽`
@@ -182,7 +70,17 @@ function DeliveredStatusPill({ statusText }: { statusText: string }) {
 }
 
 export function OrderHistoryDialogContent() {
-  const { user, openAuthDialog } = useAuth()
+  const { user, openAuthDialog, sessionJwt } = useAuth()
+  const { products } = useCatalogInventory()
+  const { orders: rawOrders, loading, error } = useMyStorefrontOrders(sessionJwt, user?.email)
+
+  const orders = useMemo(() => {
+    const safe = rawOrders.map((o) => ({
+      ...o,
+      lines: Array.isArray(o.lines) ? o.lines : [],
+    }))
+    return safe.map((o) => enrichOrderLines(o, products))
+  }, [rawOrders, products])
 
   if (!user) {
     return (
@@ -210,9 +108,18 @@ export function OrderHistoryDialogContent() {
         </p>
       </div>
 
+      {loading ? (
+        <p className="mt-10 text-sm text-gray-400">Загрузка заказов…</p>
+      ) : error ? (
+        <p className="mt-10 text-sm text-amber-300/90">Не удалось загрузить заказы. Попробуйте позже.</p>
+      ) : orders.length === 0 ? (
+        <p className="mt-10 text-sm text-gray-400">
+          Пока нет оформленных заказов. После checkout они появятся здесь и в админке.
+        </p>
+      ) : (
       <div className="mt-10 space-y-16">
-        {MOCK_ORDERS.map((order) => (
-          <div key={order.orderNumber}>
+        {orders.map((order) => (
+          <div key={order.id ?? order.orderNumber}>
             <h4 className="text-base font-medium text-white">
               Заказ от{' '}
               <time dateTime={order.placedIso}>{formatDateRuFromIso(order.placedIso)}</time>
@@ -453,6 +360,7 @@ export function OrderHistoryDialogContent() {
           </div>
         ))}
       </div>
+      )}
     </div>
   )
 }

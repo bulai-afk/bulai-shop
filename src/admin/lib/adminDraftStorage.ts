@@ -528,6 +528,11 @@ function normalizeOrderRow(raw: unknown, index: number): AdminOrderRow | null {
     deliveryDate: parseOrderDeliveryDate(r.deliveryDate),
     shippingDate: parseOrderDeliveryDate(r.shippingDate),
     customerName: typeof r.customerName === 'string' ? r.customerName : '',
+    clientId: typeof r.clientId === 'string' && r.clientId.trim() ? r.clientId.trim() : undefined,
+    clientEmail:
+      typeof r.clientEmail === 'string' && r.clientEmail.trim()
+        ? r.clientEmail.trim().toLowerCase()
+        : undefined,
     total: typeof r.total === 'string' ? r.total : '',
     status,
     paymentStatus: migrateLegacyPaymentStatus(r.paymentStatus),
@@ -549,6 +554,8 @@ function buildDefaultOrdersDraft(): AdminOrderRow[] {
       deliveryDate: '2026-03-18',
       shippingDate: '2026-03-16',
       customerName: 'Петров Иван',
+      clientId: 'client-seed-1',
+      clientEmail: 'ivan.petrov@example.com',
       total: '12 500 ₽',
       status: 'Отправка',
       paymentStatus: 'paid',
@@ -568,6 +575,8 @@ function buildDefaultOrdersDraft(): AdminOrderRow[] {
       createdAt: '2026-03-28',
       deliveryDate: '2026-04-05',
       customerName: 'Соколова Мария',
+      clientId: 'client-seed-2',
+      clientEmail: 'maria.sokolova@example.com',
       total: '48 900 ₽',
       status: 'Сборка',
       paymentStatus: 'unpaid',
