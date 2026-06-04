@@ -64,9 +64,9 @@ export default function App() {
     <CurrencyProvider>
       <BrowserRouter>
         <AuthProvider>
-          <ProfileDialogProvider>
-            <OrdersDialogProvider>
-              <CatalogInventoryProvider>
+          <CatalogInventoryProvider>
+            <ProfileDialogProvider>
+              <OrdersDialogProvider>
                 <CartProvider>
                   <Routes>
                   <Route path="admin" element={<AdminLayout />}>
@@ -124,9 +124,9 @@ export default function App() {
                   </Route>
                   </Routes>
                 </CartProvider>
-              </CatalogInventoryProvider>
-            </OrdersDialogProvider>
-          </ProfileDialogProvider>
+              </OrdersDialogProvider>
+            </ProfileDialogProvider>
+          </CatalogInventoryProvider>
         </AuthProvider>
       </BrowserRouter>
     </CurrencyProvider>

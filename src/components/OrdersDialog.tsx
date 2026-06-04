@@ -1,6 +1,7 @@
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCatalogInventory } from '../context/CatalogInventoryContext'
 import { useOrdersDialog } from '../context/OrdersDialogContext'
 import { getPageScrollElement } from '../utils/getPageScrollElement'
 import { OrderHistoryDialogContent } from './OrderHistoryDialogContent'
@@ -11,6 +12,7 @@ const ORDERS_SCROLL_RAIL_HEIGHT_TRIM_PX = 80
 
 export function OrdersDialog() {
   const { ordersDialogOpen, closeOrdersDialog } = useOrdersDialog()
+  const { products } = useCatalogInventory()
   const panelRef = useRef<HTMLElement | null>(null)
   const [pinnedRailStyle, setPinnedRailStyle] = useState<CSSProperties | undefined>(undefined)
 
@@ -80,9 +82,9 @@ export function OrdersDialog() {
             История заказов
           </DialogTitle>
 
-          <div className="min-h-0 min-w-0 overflow-hidden">
+          <div className="min-h-[min(50dvh,520px)] min-w-0 overflow-hidden">
             <PanelScrollArea
-              className="h-full min-h-0 min-w-0"
+              className="h-full min-h-[min(50dvh,520px)] min-w-0"
               pinRailToViewport
               pinnedRailClassName={profileDialogPinnedScrollbarRailClass}
               pinnedRailStyle={pinnedRailStyle}
@@ -90,7 +92,7 @@ export function OrdersDialog() {
               viewportClassName="min-w-0 pr-1 pb-2 sm:pr-1.5"
               propagateWheelToPage={false}
             >
-              <OrderHistoryDialogContent />
+              <OrderHistoryDialogContent catalogProducts={products} />
             </PanelScrollArea>
           </div>
         </DialogPanel>

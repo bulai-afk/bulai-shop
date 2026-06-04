@@ -2,7 +2,6 @@ import { CheckCircleIcon } from '@heroicons/react/24/solid'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useCatalogInventory } from '../context/CatalogInventoryContext'
 import type { Product } from '../data/catalogProducts'
 import { useMyStorefrontOrders } from '../hooks/useMyStorefrontOrders'
 import type { StorefrontOrder, StorefrontOrderLine } from '../types/storefrontOrder'
@@ -69,9 +68,13 @@ function DeliveredStatusPill({ statusText }: { statusText: string }) {
   )
 }
 
-export function OrderHistoryDialogContent() {
+type OrderHistoryDialogContentProps = {
+  /** Опционально: картинки товаров из каталога; без каталога — плейсхолдеры из API. */
+  catalogProducts?: Product[]
+}
+
+export function OrderHistoryDialogContent({ catalogProducts = [] }: OrderHistoryDialogContentProps) {
   const { user, openAuthDialog, sessionJwt } = useAuth()
-  const { products } = useCatalogInventory()
   const { orders: rawOrders, loading, error } = useMyStorefrontOrders(sessionJwt, user?.email)
 
   const orders = useMemo(() => {
@@ -79,8 +82,8 @@ export function OrderHistoryDialogContent() {
       ...o,
       lines: Array.isArray(o.lines) ? o.lines : [],
     }))
-    return safe.map((o) => enrichOrderLines(o, products))
-  }, [rawOrders, products])
+    return safe.map((o) => enrichOrderLines(o, catalogProducts))
+  }, [rawOrders, catalogProducts])
 
   if (!user) {
     return (
