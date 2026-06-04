@@ -3,6 +3,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline'
 import { useEffect, useId, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { BulaiLogo } from './BulaiLogo'
+import { useYandexOAuthConfig } from '../hooks/useYandexOAuthConfig'
 import { YandexLoginButton } from './YandexLoginButton'
 
 const fieldClass =
@@ -37,7 +38,7 @@ export function AuthDialog() {
   }, [authDialogOpen])
 
   const mode = authDialogMode
-  const hasYandex = Boolean(import.meta.env.VITE_YANDEX_CLIENT_ID?.trim())
+  const { clientId, redirectUri, configured: hasYandex, ready: yandexConfigReady } = useYandexOAuthConfig()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,7 +90,7 @@ export function AuthDialog() {
           </div>
 
           <div className="mt-8 space-y-8">
-            {authDialogOpen && hasYandex ? (
+            {authDialogOpen && hasYandex && clientId ? (
               <section aria-labelledby="auth-yandex-heading" className="space-y-4">
                 <h2
                   id="auth-yandex-heading"
@@ -98,9 +99,19 @@ export function AuthDialog() {
                   Войти через Яндекс
                 </h2>
                 <div className="flex min-h-[48px] justify-center overflow-visible">
-                  <YandexLoginButton parentId="yandex-login-auth-dialog" buttonSize="l" />
+                  <YandexLoginButton
+                    key={`yandex-auth-${authDialogOpen}`}
+                    clientId={clientId}
+                    redirectUri={redirectUri}
+                    parentId="yandex-login-auth-dialog"
+                    buttonSize="l"
+                  />
                 </div>
               </section>
+            ) : authDialogOpen && yandexConfigReady && !hasYandex && import.meta.env.DEV ? (
+              <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-center text-xs text-amber-200/90">
+                Яндекс ID: задайте VITE_YANDEX_CLIENT_ID в .env или YANDEX_OAUTH_CLIENT_ID в server/.env
+              </p>
             ) : null}
 
             {authDialogOpen && hasYandex ? (

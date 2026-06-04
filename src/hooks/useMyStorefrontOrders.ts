@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { loadClientsDraft, loadOrdersDraft, ORDERS_UPDATED_EVENT } from '../admin/lib/adminDraftStorage'
-import { fetchMyStorefrontOrders } from '../api/storefrontOrdersApi'
+import { fetchMyStorefrontOrders, StorefrontOrdersApiError } from '../api/storefrontOrdersApi'
+import { resolveStorefrontBuyerEmail } from '../utils/sessionEmail'
 import { isSiteConfigApiExpected } from '../constants/apiBase'
 import { resolveClientIdForEmail } from '../lib/createOrderFromCheckout'
 import type { StorefrontOrder } from '../types/storefrontOrder'
@@ -34,20 +35,25 @@ function mergeOrders(remote: StorefrontOrder[], local: StorefrontOrder[]): Store
 export function useMyStorefrontOrders(sessionJwt: string | null, userEmail: string | undefined) {
   const [orders, setOrders] = useState<StorefrontOrder[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(false)
+  /** Сессия недействительна (401/403). */
+  const [authError, setAuthError] = useState(false)
+  /** Сервер недоступен или ошибка, локальных заказов нет. */
+  const [syncError, setSyncError] = useState(false)
 
   const load = useCallback(async () => {
-    const email = userEmail?.trim()
+    const email = resolveStorefrontBuyerEmail(sessionJwt, userEmail)
     if (!email) {
       setOrders([])
-      setError(false)
+      setAuthError(false)
+      setSyncError(false)
       return
     }
 
     const local = loadLocalStorefrontOrders(email)
     setOrders(local)
     setLoading(true)
-    setError(false)
+    setAuthError(false)
+    setSyncError(false)
 
     const useApi = isSiteConfigApiExpected() && Boolean(sessionJwt)
     if (!useApi) {
@@ -59,10 +65,14 @@ export function useMyStorefrontOrders(sessionJwt: string | null, userEmail: stri
       const remote = (await fetchMyStorefrontOrders(sessionJwt!)).map(normalizeApiOrder)
       const merged = mergeOrders(remote, local)
       setOrders(merged.length > 0 ? merged : local)
-      setError(false)
-    } catch {
+      setAuthError(false)
+      setSyncError(false)
+    } catch (e) {
       setOrders(local)
-      setError(local.length === 0)
+      const status = e instanceof StorefrontOrdersApiError ? e.status : 0
+      const authFailed = status === 401 || status === 403
+      setAuthError(authFailed)
+      setSyncError(!authFailed && local.length === 0)
     } finally {
       setLoading(false)
     }
@@ -80,5 +90,13 @@ export function useMyStorefrontOrders(sessionJwt: string | null, userEmail: stri
     return () => window.removeEventListener(ORDERS_UPDATED_EVENT, onUpdate)
   }, [load])
 
-  return { orders, loading, error, reload: load }
+  return {
+    orders,
+    loading,
+    /** @deprecated используйте authError / syncError */
+    error: authError || syncError,
+    authError,
+    syncError,
+    reload: load,
+  }
 }

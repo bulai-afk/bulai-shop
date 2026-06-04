@@ -1,5 +1,6 @@
 import { createApp } from './app.js'
 import { config } from './config.js'
+import { seedDevAdminSnapshotsIfEmpty } from './lib/seedDevAdminSnapshots.js'
 import { seedDevCatalogFromSyncIfEmpty } from './lib/seedDevCatalogFromSync.js'
 
 const app = createApp()
@@ -14,7 +15,10 @@ const server = app.listen(config.port, () => {
   )
   if (config.nodeEnv === 'development') {
     void seedDevCatalogFromSyncIfEmpty().catch((err) => {
-      console.warn('[bulai-shop-api] dev seed skipped:', err instanceof Error ? err.message : err)
+      console.warn('[bulai-shop-api] dev catalog seed skipped:', err instanceof Error ? err.message : err)
+    })
+    void seedDevAdminSnapshotsIfEmpty().catch((err) => {
+      console.warn('[bulai-shop-api] dev orders seed skipped:', err instanceof Error ? err.message : err)
     })
   }
 })

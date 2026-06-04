@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, type Request } from 'express'
 import { config } from '../config.js'
 import { signSessionToken } from '../lib/sessionJwt.js'
 import {
@@ -7,6 +7,21 @@ import {
 } from '../lib/yandexLoginInfoServer.js'
 
 export const authSessionRouter = Router()
+
+function yandexRedirectUriFromRequest(req: Request): string {
+  if (config.yandexOAuthRedirectUri) return config.yandexOAuthRedirectUri
+  const proto = (req.get('x-forwarded-proto') ?? req.protocol ?? 'https').split(',')[0]?.trim() || 'https'
+  const host = (req.get('x-forwarded-host') ?? req.get('host') ?? '').split(',')[0]?.trim()
+  if (!host) return ''
+  return `${proto}://${host}/auth/yandex/callback`
+}
+
+/** GET /api/auth/yandex-config — публичный client_id (если не зашит в Vite при сборке). */
+authSessionRouter.get('/yandex-config', (req, res) => {
+  const clientId = config.yandexOAuthClientId || null
+  const redirectUri = clientId ? yandexRedirectUriFromRequest(req) || null : null
+  res.json({ clientId, redirectUri })
+})
 
 /**
  * POST /api/auth/session

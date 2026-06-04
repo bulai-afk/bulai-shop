@@ -1,6 +1,9 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { buildYandexOAuthAuthorizeUrl } from '../utils/yandexOAuthUrl'
 
 type YandexLoginButtonProps = {
+  clientId: string
+  redirectUri: string
   /** id контейнера, куда SDK вставит кнопку */
   parentId: string
   buttonSize?: 'xs' | 's' | 'm' | 'l' | 'xl' | 'xxl'
@@ -13,19 +16,18 @@ type YandexLoginButtonProps = {
  * (URL без .html: /auth/yandex/callback — см. vite.config.ts).
  */
 export function YandexLoginButton({
+  clientId,
+  redirectUri,
   parentId,
   buttonSize = 'm',
   className = '',
 }: YandexLoginButtonProps) {
-  const clientId = import.meta.env.VITE_YANDEX_CLIENT_ID?.trim()
   const containerRef = useRef<HTMLDivElement>(null)
+  const [showFallback, setShowFallback] = useState(false)
 
   useLayoutEffect(() => {
-    if (!clientId) return
-
+    setShowFallback(false)
     const origin = window.location.origin
-    const redirectUri =
-      import.meta.env.VITE_YANDEX_REDIRECT_URI?.trim() || `${origin}/auth/yandex/callback`
 
     let cancelled = false
     let attempt = 0
@@ -84,23 +86,45 @@ export function YandexLoginButton({
         })
     }
 
-    run()
+    const startId = window.setTimeout(run, 0)
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (cancelled) return
+      const el = containerRef.current
+      const hasWidget =
+        el &&
+        (el.querySelector('iframe') ||
+          el.querySelector('button') ||
+          el.querySelector('a') ||
+          el.childElementCount > 0)
+      if (!hasWidget) setShowFallback(true)
+    }, 2500)
 
     return () => {
       cancelled = true
+      window.clearTimeout(startId)
+      window.clearTimeout(fallbackTimer)
       containerRef.current?.replaceChildren()
     }
-  }, [clientId, parentId, buttonSize])
+  }, [clientId, redirectUri, parentId, buttonSize])
 
-  if (!clientId) {
-    return null
-  }
+  const fallbackHref = buildYandexOAuthAuthorizeUrl(clientId, redirectUri)
 
   return (
-    <div
-      ref={containerRef}
-      id={parentId}
-      className={`flex min-h-[40px] min-w-[200px] items-center justify-center [&_iframe]:max-w-full ${className}`.trim()}
-    />
+    <div className={`flex flex-col items-center gap-3 ${className}`.trim()}>
+      <div
+        ref={containerRef}
+        id={parentId}
+        className="flex min-h-[48px] min-w-[220px] items-center justify-center [&_iframe]:max-w-full"
+      />
+      {showFallback ? (
+        <a
+          href={fallbackHref}
+          className="inline-flex min-h-[44px] min-w-[220px] items-center justify-center rounded-lg bg-[#fc3f1d] px-5 text-sm font-medium text-white transition hover:bg-[#e6381a]"
+        >
+          Войти с Яндекс ID
+        </a>
+      ) : null}
+    </div>
   )
 }

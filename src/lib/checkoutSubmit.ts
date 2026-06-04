@@ -59,6 +59,23 @@ export async function submitCheckoutOrder(params: SubmitCheckoutParams): Promise
       deliveryNote: params.deliveryMethodLabel,
     }
     const res = await postCheckout(params.sessionJwt, body)
+    const order = buildAdminOrderFromCheckout(
+      {
+        clientEmail: email,
+        clientId,
+        firstName: params.firstName,
+        lastName: params.lastName,
+        phone: params.phone,
+        lines: params.lines,
+        appliedPromoCode: params.appliedPromoCode,
+        appliedPromoPercent: params.appliedPromoPercent,
+        paymentMethod: params.paymentMethod,
+        deliveryMethodLabel: params.deliveryMethodLabel,
+      },
+      existing,
+    )
+    order.orderNumber = res.orderNumber
+    saveOrdersDraft([...existing, order])
     window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT))
     return { orderNumber: res.orderNumber, usedApi: true }
   }

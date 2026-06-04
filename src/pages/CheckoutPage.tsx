@@ -11,6 +11,7 @@ import { MoneyWithGlyph } from '../components/MoneyWithGlyph'
 import { checkoutEmailFieldError, contactEmailError } from '../lib/contactEmail'
 import { formatPhoneForSummaryLine, isCompleteStoredPhoneDigits } from '../lib/contactPhoneInputDisplay'
 import { submitCheckoutOrder } from '../lib/checkoutSubmit'
+import { resolveStorefrontBuyerEmail } from '../utils/sessionEmail'
 
 function lineSaleTotalRub(line: CartLine): number {
   const unit = parseInt(line.priceDisplay.replace(/\D/g, ''), 10) || 0
@@ -207,9 +208,10 @@ export function CheckoutPage() {
     setCheckoutError(null)
     setCheckoutSubmitting(true)
     try {
+      const buyerEmail = resolveStorefrontBuyerEmail(sessionJwt, user.email) ?? user.email
       const result = await submitCheckoutOrder({
         sessionJwt,
-        userEmail: user.email,
+        userEmail: buyerEmail,
         firstName,
         lastName,
         phone: formatPhoneForSummaryLine(phoneTel) || phoneTel,

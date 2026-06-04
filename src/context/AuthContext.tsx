@@ -16,6 +16,7 @@ import {
   fetchYandexLoginInfo,
 } from '../api/yandexLoginInfo'
 import { SESSION_JWT_STORAGE_KEY } from '../constants/sessionJwtStorage'
+import { YANDEX_OAUTH_TOKEN_PENDING_KEY } from '../constants/yandexOAuthStorage'
 import { YANDEX_AUTH_SUCCESS_PARAM } from '../constants/yandexAuth'
 
 const STORAGE_KEY = 'bulai-shop-auth'
@@ -206,6 +207,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })()
     }
     window.addEventListener('yandex-auth-suggest', onYandex)
+    try {
+      const pending = sessionStorage.getItem(YANDEX_OAUTH_TOKEN_PENDING_KEY)?.trim()
+      if (pending) {
+        sessionStorage.removeItem(YANDEX_OAUTH_TOKEN_PENDING_KEY)
+        window.dispatchEvent(
+          new CustomEvent('yandex-auth-suggest', { detail: { access_token: pending } }),
+        )
+      }
+    } catch {
+      // ignore
+    }
     return () => window.removeEventListener('yandex-auth-suggest', onYandex)
   }, [hydrated, location.pathname, location.search, location.hash, navigate])
 

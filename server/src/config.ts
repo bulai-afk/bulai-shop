@@ -33,4 +33,11 @@ export const config = {
   staticDir: (process.env.STATIC_DIR ?? '').trim(),
   /** Населённый пункт для https://belarusbank.by/api/kursExchange?city=… */
   belarusbankKursCity: (process.env.BELARUSBANK_KURS_CITY ?? 'Минск').trim() || 'Минск',
+  /** OAuth Яндекс ID для витрины (публичный client_id; можно задать на сервере без пересборки фронта). */
+  yandexOAuthClientId: (
+    process.env.YANDEX_OAUTH_CLIENT_ID ??
+    process.env.VITE_YANDEX_CLIENT_ID ??
+    ''
+  ).trim(),
+  yandexOAuthRedirectUri: (process.env.YANDEX_REDIRECT_URI ?? process.env.VITE_YANDEX_REDIRECT_URI ?? '').trim(),
 } as const

@@ -75,7 +75,10 @@ type OrderHistoryDialogContentProps = {
 
 export function OrderHistoryDialogContent({ catalogProducts = [] }: OrderHistoryDialogContentProps) {
   const { user, openAuthDialog, sessionJwt } = useAuth()
-  const { orders: rawOrders, loading, error } = useMyStorefrontOrders(sessionJwt, user?.email)
+  const { orders: rawOrders, loading, authError, syncError, reload } = useMyStorefrontOrders(
+    sessionJwt,
+    user?.email,
+  )
 
   const orders = useMemo(() => {
     const safe = rawOrders.map((o) => ({
@@ -113,8 +116,33 @@ export function OrderHistoryDialogContent({ catalogProducts = [] }: OrderHistory
 
       {loading ? (
         <p className="mt-10 text-sm text-gray-400">Загрузка заказов…</p>
-      ) : error ? (
-        <p className="mt-10 text-sm text-amber-300/90">Не удалось загрузить заказы. Попробуйте позже.</p>
+      ) : authError ? (
+        <div className="mt-10 max-w-lg space-y-4">
+          <p className="text-sm text-amber-300/90">Сессия истекла или недействительна. Войдите снова.</p>
+          <button
+            type="button"
+            onClick={() => openAuthDialog()}
+            className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500"
+          >
+            Войти
+          </button>
+        </div>
+      ) : syncError ? (
+        <div className="mt-10 max-w-lg space-y-4">
+          <p className="text-sm text-amber-300/90">
+            Не удалось загрузить заказы с сервера.
+            {import.meta.env.DEV
+              ? ' Запустите API: npm run dev:stack (или npm run dev:api в отдельном терминале).'
+              : ' Попробуйте обновить страницу чуть позже.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => void reload()}
+            className="rounded-lg border border-white/15 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/5"
+          >
+            Повторить
+          </button>
+        </div>
       ) : orders.length === 0 ? (
         <p className="mt-10 text-sm text-gray-400">
           Пока нет оформленных заказов. После checkout они появятся здесь и в админке.

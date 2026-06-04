@@ -53,8 +53,10 @@ dig +short bulai.by A
 | `DEPLOY_USER` | **`h202138`** для bulai.by на 87.232 (ключ `~/.ssh/deploy_bulai` на Mac) |
 | `DEPLOY_REMOTE_DIR` | **`www/bulai.by`** (не `bulai-shop`) |
 | `DEPLOY_SSH_KEY` | Приватный SSH-ключ (можно тот же) |
-| `VITE_YANDEX_CLIENT_ID` | OAuth Яндекс |
+| `VITE_YANDEX_CLIENT_ID` | OAuth Яндекс (вшивается в сборку фронта) |
 | `VITE_YANDEX_REDIRECT_URI` | Необязательно: `https://домен/auth/yandex/callback` |
+
+На сервере в `server/.env` можно вместо пересборки задать **`YANDEX_OAUTH_CLIENT_ID`** (тот же client_id) — витрина получит его через `GET /api/auth/yandex-config`.
 | `DEPLOY_REMOTE_DIR` | Необязательно, по умолчанию `bulai-shop` |
 | `DEPLOY_PORT` | Необязательно, порт **Node** на сервере (по умолчанию `3001`) |
 | `DEPLOY_SSH_PORT` | Необязательно, порт **SSH** (по умолчанию `22`) |

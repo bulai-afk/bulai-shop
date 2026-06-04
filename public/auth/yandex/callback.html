@@ -8,12 +8,26 @@
   </head>
   <body>
     <script>
-      window.onload = function () {
-        if (typeof window.YaSendSuggestToken === 'function') {
-          // Адрес витрины (origin страницы с кнопкой/виджетом мгновенного входа), как в шаге 4 документации Яндекса.
-          window.YaSendSuggestToken(window.location.origin, {})
+      ;(function () {
+        var hash = window.location.hash || ''
+        if (hash.indexOf('access_token=') !== -1) {
+          var params = new URLSearchParams(hash.replace(/^#/, ''))
+          var token = params.get('access_token')
+          if (token) {
+            try {
+              sessionStorage.setItem('bulai-shop-yandex-oauth-token-pending', token)
+            } catch (e) {}
+            window.location.replace(window.location.origin + '/')
+            return
+          }
         }
-      }
+
+        window.onload = function () {
+          if (typeof window.YaSendSuggestToken === 'function') {
+            window.YaSendSuggestToken(window.location.origin, {})
+          }
+        }
+      })()
     </script>
   </body>
 </html>
