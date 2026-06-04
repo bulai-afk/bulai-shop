@@ -130,7 +130,7 @@ export function profileExtrasFromClientTableRow(row: {
   return migrateProfileExtrasPhoneFields(merged)
 }
 
-function readExtras(accountEmail: string): ProfileExtras {
+export function readProfileExtras(accountEmail: string): ProfileExtras {
   try {
     const raw = getProfileExtrasJsonRawForAccount(accountEmail)
     if (!raw) return defaultExtras()
@@ -184,7 +184,7 @@ function writeExtras(accountEmail: string, e: ProfileExtras) {
   localStorage.setItem(profileExtrasStorageKey(accountEmail), JSON.stringify(e))
 }
 
-function buildFormFromUser(user: AuthUser, extras: ProfileExtras): ProfileExtras {
+export function buildFormFromUser(user: AuthUser, extras: ProfileExtras): ProfileExtras {
   return migrateProfileExtrasPhoneFields({
     ...extras,
     firstName: extras.firstName || user.firstName || '',
@@ -222,7 +222,7 @@ export function ProfileForm({ onSaveSuccess, onStorefrontSaveDone, adminDraft }:
   const savedSnapshot = useRef<string>('')
 
   const hydrate = useCallback((u: AuthUser) => {
-    const merged = buildFormFromUser(u, readExtras(u.email))
+    const merged = buildFormFromUser(u, readProfileExtras(u.email))
     setForm(merged)
     savedSnapshot.current = JSON.stringify(merged)
     setAvatarPreview(null)

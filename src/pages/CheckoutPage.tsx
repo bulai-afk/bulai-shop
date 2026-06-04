@@ -10,6 +10,7 @@ import { formatCartAmount, useCart, type CartLine } from '../context/CartContext
 import { MoneyWithGlyph } from '../components/MoneyWithGlyph'
 import { checkoutEmailFieldError, contactEmailError } from '../lib/contactEmail'
 import { formatPhoneForSummaryLine, isCompleteStoredPhoneDigits } from '../lib/contactPhoneInputDisplay'
+import { useCheckoutContactPrefill } from '../hooks/useCheckoutContactPrefill'
 import { submitCheckoutOrder } from '../lib/checkoutSubmit'
 import { resolveStorefrontBuyerEmail } from '../utils/sessionEmail'
 
@@ -138,9 +139,7 @@ export function CheckoutPage() {
     else setPromoCode('')
   }, [appliedPromoCode])
 
-  useEffect(() => {
-    if (user?.email) setEmail(user.email)
-  }, [user?.email])
+  useCheckoutContactPrefill(user, sessionJwt, setFirstName, setLastName, setEmail, setPhoneTel)
 
   const emailOk = useMemo(
     () => email.trim().length > 0 && contactEmailError(email) === null,
