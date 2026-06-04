@@ -285,6 +285,12 @@ export function AdminProductsStocksPage() {
   /** На вкладке «Остатки»: какие склады участвуют в сумме в таблице (чекбоксы в шестерёнке). */
   const [allTabIncludedWarehouseIds, setAllTabIncludedWarehouseIds] = useState<string[]>([])
   const allTabWarehouseSelectionInitRef = useRef(false)
+  /** Локальные правки склада — не перезаписывать опоздавшим ответом GET /api/admin/data. */
+  const userTouchedDraftRef = useRef(false)
+  const [supplyDialogError, setSupplyDialogError] = useState<string | null>(null)
+  const [supplyDialogSaving, setSupplyDialogSaving] = useState(false)
+  const [defectDialogError, setDefectDialogError] = useState<string | null>(null)
+  const [defectDialogSaving, setDefectDialogSaving] = useState(false)
   const [allTabWarehouseSelectionReady, setAllTabWarehouseSelectionReady] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
@@ -371,6 +377,7 @@ export function AdminProductsStocksPage() {
       try {
         const remote = await fetchAdminProductsInventoryFromApi()
         if (cancelled || remote == null) return
+        if (userTouchedDraftRef.current) return
         saveProductsInventoryDraft(remote)
         setDraft(ensureStockRowsForCatalog(loadProductsInventoryDraft()))
       } catch {
@@ -797,47 +804,69 @@ export function AdminProductsStocksPage() {
     return next
   }, [filteredProducts, sortKey, sortDir, stocksByProduct, getRowMetrics])
 
-  const persistProductsInventory = async () => {
+  const buildPersistedInventory = useCallback(
+    (source: ProductsInventoryDraft): ProductsInventoryDraft => {
+      const primaryWh = resolvePrimaryWarehouseId(source.warehouses)
+      const receiptsMap = buildReceiptsFromSuppliesMap(source.supplies)
+      const defectsMap = buildDefectsFromDefectRecordsMap(source.defectRecords)
+      const orderMap = buildOrderMetricsFromAdminOrders(adminOrders, source.catalog, source.warehouses)
+      return {
+        ...source,
+        stocks: source.stocks.map((row) => ({
+          productId: row.productId,
+          byWarehouse: Object.fromEntries(
+            source.warehouses.map((w) => {
+              const receipts = receiptUnitsFromSupplies(receiptsMap, row.productId, w.id)
+              const defects = receiptUnitsFromSupplies(defectsMap, row.productId, w.id)
+              const split = orderMetricsFromMap(orderMap, row.productId, w.id)
+              const orders = w.id === primaryWh ? split.orders : 0
+              const preorders = w.id === primaryWh ? split.preorders : 0
+              return [
+                w.id,
+                withDerivedStock({
+                  ...getWarehouseStock(row.byWarehouse, w.id),
+                  receipts,
+                  defects,
+                  orders,
+                  preorders,
+                }),
+              ]
+            }),
+          ),
+        })),
+      }
+    },
+    [adminOrders],
+  )
+
+  const persistProductsInventoryFromDraft = async (
+    source: ProductsInventoryDraft,
+    options?: { requireServer?: boolean },
+  ): Promise<{ ok: true } | { ok: false; message: string }> => {
     setApiError(null)
-    const primaryWh = resolvePrimaryWarehouseId(draft.warehouses)
-    const orderMap = buildOrderMetricsFromAdminOrders(adminOrders, draft.catalog, draft.warehouses)
-    const toSave: ProductsInventoryDraft = {
-      ...draft,
-      stocks: draft.stocks.map((row) => ({
-        productId: row.productId,
-        byWarehouse: Object.fromEntries(
-          draft.warehouses.map((w) => {
-            const receipts = receiptUnitsFromSupplies(receiptsFromSuppliesMap, row.productId, w.id)
-            const defects = receiptUnitsFromSupplies(defectsFromDefectRecordsMap, row.productId, w.id)
-            const split = orderMetricsFromMap(orderMap, row.productId, w.id)
-            const orders = w.id === primaryWh ? split.orders : 0
-            const preorders = w.id === primaryWh ? split.preorders : 0
-            return [
-              w.id,
-              withDerivedStock({
-                ...getWarehouseStock(row.byWarehouse, w.id),
-                receipts,
-                defects,
-                orders,
-                preorders,
-              }),
-            ]
-          }),
-        ),
-      })),
-    }
+    const toSave = buildPersistedInventory(source)
+    userTouchedDraftRef.current = true
     saveProductsInventoryDraft(toSave)
     setDraft(ensureStockRowsForCatalog(loadProductsInventoryDraft()))
-    if (isSiteConfigApiExpected()) {
+
+    const apiExpected = isSiteConfigApiExpected()
+    if (apiExpected || options?.requireServer) {
       try {
         await putAdminProductsInventoryToApi(toSave)
       } catch (err) {
-        setApiError(err instanceof Error ? err.message : 'Не удалось сохранить в базу.')
-        return
+        const message = err instanceof Error ? err.message : 'Не удалось сохранить в базу.'
+        setApiError(message)
+        return { ok: false, message }
       }
     }
+
     setSavedFlash(true)
     window.setTimeout(() => setSavedFlash(false), 2200)
+    return { ok: true }
+  }
+
+  const persistProductsInventory = async () => {
+    await persistProductsInventoryFromDraft(draft)
   }
 
   const onSave = async (e: FormEvent) => {
@@ -990,6 +1019,7 @@ export function AdminProductsStocksPage() {
 
   const openSupplyAddDialog = () => {
     setSupplyDialogEditId(null)
+    setSupplyDialogError(null)
     const firstW = draft.warehouses[0]?.id ?? ''
     const firstS = draft.suppliers[0]?.id ?? ''
     setSupplyFormWarehouseId(firstW)
@@ -1006,6 +1036,7 @@ export function AdminProductsStocksPage() {
   }
 
   const openSupplyEditDialog = (s: SupplyRecord) => {
+    setSupplyDialogError(null)
     setSupplyDialogEditId(s.id)
     setSupplyFormWarehouseId(s.warehouseId)
     setSupplyFormSupplierId(s.supplierId)
@@ -1031,8 +1062,21 @@ export function AdminProductsStocksPage() {
     })
   }
 
-  const confirmSupplyDialog = () => {
-    if (!supplyFormWarehouseId || !supplyFormSupplierId) return
+  const confirmSupplyDialog = async () => {
+    if (supplyDialogSaving) return
+    setSupplyDialogError(null)
+    if (draft.warehouses.length === 0) {
+      setSupplyDialogError('Сначала добавьте склад (шестерёнка «Склады»).')
+      return
+    }
+    if (draft.suppliers.length === 0) {
+      setSupplyDialogError('Сначала добавьте поставщика на вкладке «Поставщики».')
+      return
+    }
+    if (!supplyFormWarehouseId || !supplyFormSupplierId) {
+      setSupplyDialogError('Выберите склад поступления и поставщика из списка.')
+      return
+    }
     const productIds = new Set(draft.catalog.map((p) => p.id))
     const lines = supplyFormLines
       .map((l) => ({
@@ -1041,7 +1085,10 @@ export function AdminProductsStocksPage() {
       }))
       .filter((l) => l.productId && productIds.has(l.productId))
     const activeLines = lines.filter((l) => l.quantity > 0)
-    if (activeLines.length === 0) return
+    if (activeLines.length === 0) {
+      setSupplyDialogError('Добавьте хотя бы одну позицию с количеством больше 0.')
+      return
+    }
 
     const rating = Math.min(5, Math.max(0, Math.round(supplyFormRating)))
     const normalized = {
@@ -1054,33 +1101,42 @@ export function AdminProductsStocksPage() {
       lines: activeLines,
     }
 
+    let nextDraft: ProductsInventoryDraft
     if (supplyDialogEditId) {
-      setDraft((prev) => {
-        const old = prev.supplies.find((s) => s.id === supplyDialogEditId)
-        if (!old) return prev
-        let suppliers = prev.suppliers
-        if (old.supplierId !== normalized.supplierId) {
-          suppliers = suppliers.map((s) => {
-            if (s.id === old.supplierId) return { ...s, supplyCount: Math.max(0, s.supplyCount - 1) }
-            if (s.id === normalized.supplierId) return { ...s, supplyCount: s.supplyCount + 1 }
-            return s
-          })
-        }
-        return {
-          ...prev,
-          supplies: prev.supplies.map((s) => (s.id === supplyDialogEditId ? { ...s, ...normalized } : s)),
-          suppliers,
-        }
+      const old = draft.supplies.find((s) => s.id === supplyDialogEditId)
+      if (!old) {
+        setSupplyDialogError('Запись поставки не найдена. Обновите страницу.')
+        return
+      }
+      let suppliers = draft.suppliers
+      if (old.supplierId !== normalized.supplierId) {
+        suppliers = suppliers.map((s) => {
+          if (s.id === old.supplierId) return { ...s, supplyCount: Math.max(0, s.supplyCount - 1) }
+          if (s.id === normalized.supplierId) return { ...s, supplyCount: s.supplyCount + 1 }
+          return s
+        })
+      }
+      nextDraft = ensureStockRowsForCatalog({
+        ...draft,
+        supplies: draft.supplies.map((s) => (s.id === supplyDialogEditId ? { ...s, ...normalized } : s)),
+        suppliers,
       })
     } else {
       const id = `sup-${crypto.randomUUID()}`
-      setDraft((prev) => ({
-        ...prev,
-        supplies: [...prev.supplies, { id, ...normalized }],
-        suppliers: prev.suppliers.map((s) =>
+      nextDraft = ensureStockRowsForCatalog({
+        ...draft,
+        supplies: [...draft.supplies, { id, ...normalized }],
+        suppliers: draft.suppliers.map((s) =>
           s.id === supplyFormSupplierId ? { ...s, supplyCount: s.supplyCount + 1 } : s,
         ),
-      }))
+      })
+    }
+    setSupplyDialogSaving(true)
+    const result = await persistProductsInventoryFromDraft(nextDraft, { requireServer: true })
+    setSupplyDialogSaving(false)
+    if (!result.ok) {
+      setSupplyDialogError(result.message)
+      return
     }
     setSupplyDialogOpen(false)
     setSupplyDialogEditId(null)
@@ -1104,6 +1160,7 @@ export function AdminProductsStocksPage() {
   }
 
   const openDefectAddDialog = () => {
+    setDefectDialogError(null)
     setDefectDialogEditId(null)
     const firstW = draft.warehouses[0]?.id ?? ''
     const firstS = draft.suppliers[0]?.id ?? ''
@@ -1121,6 +1178,7 @@ export function AdminProductsStocksPage() {
   }
 
   const openDefectEditDialog = (s: DefectRecord) => {
+    setDefectDialogError(null)
     setDefectDialogEditId(s.id)
     setDefectFormWarehouseId(s.warehouseId)
     setDefectFormSupplierId(s.supplierId)
@@ -1146,8 +1204,21 @@ export function AdminProductsStocksPage() {
     })
   }
 
-  const confirmDefectDialog = () => {
-    if (!defectFormWarehouseId || !defectFormSupplierId) return
+  const confirmDefectDialog = async () => {
+    if (defectDialogSaving) return
+    setDefectDialogError(null)
+    if (draft.warehouses.length === 0) {
+      setDefectDialogError('Сначала добавьте склад.')
+      return
+    }
+    if (draft.suppliers.length === 0) {
+      setDefectDialogError('Сначала добавьте поставщика.')
+      return
+    }
+    if (!defectFormWarehouseId || !defectFormSupplierId) {
+      setDefectDialogError('Выберите склад и поставщика из списка.')
+      return
+    }
     const productIds = new Set(draft.catalog.map((p) => p.id))
     const lines = defectFormLines
       .map((l) => ({
@@ -1156,7 +1227,10 @@ export function AdminProductsStocksPage() {
       }))
       .filter((l) => l.productId && productIds.has(l.productId))
     const activeLines = lines.filter((l) => l.quantity > 0)
-    if (activeLines.length === 0) return
+    if (activeLines.length === 0) {
+      setDefectDialogError('Добавьте хотя бы одну позицию с количеством больше 0.')
+      return
+    }
 
     const rating = Math.min(5, Math.max(0, Math.round(defectFormRating)))
     const normalized = {
@@ -1169,35 +1243,45 @@ export function AdminProductsStocksPage() {
       lines: activeLines,
     }
 
+    let nextDraft: ProductsInventoryDraft
     if (defectDialogEditId) {
-      setDraft((prev) => {
-        const old = prev.defectRecords.find((s) => s.id === defectDialogEditId)
-        if (!old) return prev
-        let suppliers = prev.suppliers
-        if (old.supplierId !== normalized.supplierId) {
-          suppliers = suppliers.map((s) => {
-            if (s.id === old.supplierId) return { ...s, defectCount: Math.max(0, s.defectCount - 1) }
-            if (s.id === normalized.supplierId) return { ...s, defectCount: s.defectCount + 1 }
-            return s
-          })
-        }
-        return {
-          ...prev,
-          defectRecords: prev.defectRecords.map((s) =>
-            s.id === defectDialogEditId ? { ...s, ...normalized } : s,
-          ),
-          suppliers,
-        }
+      const old = draft.defectRecords.find((s) => s.id === defectDialogEditId)
+      if (!old) {
+        setDefectDialogError('Запись не найдена. Обновите страницу.')
+        return
+      }
+      let suppliers = draft.suppliers
+      if (old.supplierId !== normalized.supplierId) {
+        suppliers = suppliers.map((s) => {
+          if (s.id === old.supplierId) return { ...s, defectCount: Math.max(0, s.defectCount - 1) }
+          if (s.id === normalized.supplierId) return { ...s, defectCount: s.defectCount + 1 }
+          return s
+        })
+      }
+      nextDraft = ensureStockRowsForCatalog({
+        ...draft,
+        defectRecords: draft.defectRecords.map((s) =>
+          s.id === defectDialogEditId ? { ...s, ...normalized } : s,
+        ),
+        suppliers,
       })
     } else {
       const id = `def-${crypto.randomUUID()}`
-      setDraft((prev) => ({
-        ...prev,
-        defectRecords: [...prev.defectRecords, { id, ...normalized }],
-        suppliers: prev.suppliers.map((s) =>
+      nextDraft = ensureStockRowsForCatalog({
+        ...draft,
+        defectRecords: [...draft.defectRecords, { id, ...normalized }],
+        suppliers: draft.suppliers.map((s) =>
           s.id === defectFormSupplierId ? { ...s, defectCount: s.defectCount + 1 } : s,
         ),
-      }))
+      })
+    }
+
+    setDefectDialogSaving(true)
+    const result = await persistProductsInventoryFromDraft(nextDraft, { requireServer: true })
+    setDefectDialogSaving(false)
+    if (!result.ok) {
+      setDefectDialogError(result.message)
+      return
     }
     setDefectDialogOpen(false)
     setDefectDialogEditId(null)
@@ -2397,27 +2481,37 @@ export function AdminProductsStocksPage() {
                 )}
               </div>
             </div>
-            <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-white/10 pt-4">
+            <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-4">
+              {supplyDialogError ? (
+                <p className="text-sm text-rose-400" role="alert">
+                  {supplyDialogError}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
+                disabled={supplyDialogSaving}
                 onClick={() => {
                   setSupplyDialogOpen(false)
                   setSupplyDialogEditId(null)
+                  setSupplyDialogError(null)
                   setSupplyWarehouseQuery('')
                   setSupplySupplierQuery('')
                   setSupplyLineSkuQuery('')
                 }}
-                className="rounded-md border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200 transition hover:border-white/25 hover:bg-white/10"
+                className="rounded-md border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200 transition hover:border-white/25 hover:bg-white/10 disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
                 type="button"
-                onClick={confirmSupplyDialog}
-                className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                disabled={supplyDialogSaving}
+                onClick={() => void confirmSupplyDialog()}
+                className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-wait disabled:opacity-70"
               >
-                Сохранить
+                {supplyDialogSaving ? 'Сохранение на сервер…' : 'Сохранить'}
               </button>
+              </div>
             </div>
           </DialogPanel>
         </div>
@@ -2748,27 +2842,37 @@ export function AdminProductsStocksPage() {
                 )}
               </div>
             </div>
-            <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-white/10 pt-4">
+            <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-4">
+              {defectDialogError ? (
+                <p className="text-sm text-rose-400" role="alert">
+                  {defectDialogError}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
+                disabled={defectDialogSaving}
                 onClick={() => {
                   setDefectDialogOpen(false)
                   setDefectDialogEditId(null)
+                  setDefectDialogError(null)
                   setDefectWarehouseQuery('')
                   setDefectSupplierQuery('')
                   setDefectLineSkuQuery('')
                 }}
-                className="rounded-md border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200 transition hover:border-white/25 hover:bg-white/10"
+                className="rounded-md border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200 transition hover:border-white/25 hover:bg-white/10 disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
                 type="button"
-                onClick={confirmDefectDialog}
-                className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                disabled={defectDialogSaving}
+                onClick={() => void confirmDefectDialog()}
+                className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-wait disabled:opacity-70"
               >
-                Сохранить
+                {defectDialogSaving ? 'Сохранение на сервер…' : 'Сохранить'}
               </button>
+              </div>
             </div>
           </DialogPanel>
         </div>

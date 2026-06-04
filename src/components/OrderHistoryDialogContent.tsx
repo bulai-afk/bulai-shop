@@ -145,7 +145,7 @@ export function OrderHistoryDialogContent({ catalogProducts = [] }: OrderHistory
         </div>
       ) : orders.length === 0 ? (
         <p className="mt-10 text-sm text-gray-400">
-          Пока нет оформленных заказов. После checkout они появятся здесь и в админке.
+          Пока нет оформленных заказов.
         </p>
       ) : (
       <div className="mt-10 space-y-16">
