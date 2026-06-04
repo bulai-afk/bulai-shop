@@ -257,7 +257,7 @@ export function Navbar({
               {siteContact.contact.phoneTel.trim() ? (
                 <a
                   href={`tel:${siteContact.contact.phoneTel.trim()}`}
-                  className="hidden h-10 min-w-0 max-w-[min(100%,15rem)] items-center truncate rounded-md px-2 text-base font-semibold leading-none tabular-nums text-indigo-400 transition hover:text-indigo-300 sm:inline-flex lg:text-lg"
+                  className="hidden h-10 min-w-0 max-w-[min(100%,15rem)] items-center truncate rounded-md px-2 text-base font-semibold leading-none tabular-nums text-indigo-400 transition hover:text-indigo-300 nav:inline-flex lg:text-lg"
                 >
                   {siteContact.contact.phoneDisplay.trim() || siteContact.contact.phoneTel.trim()}
                 </a>
