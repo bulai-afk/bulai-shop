@@ -39,6 +39,25 @@ function formatDiscountRub(amount: number) {
   return `−${amount.toLocaleString('ru-RU')} ₽`
 }
 
+function isProductPageHref(href: string) {
+  return /\/product\/[^/]+/.test(href)
+}
+
+function OrderLineProductName({ line }: { line: StorefrontOrderLine }) {
+  const nameClass = 'font-medium text-white transition hover:text-indigo-300'
+  if (!isProductPageHref(line.productHref)) {
+    return <div className={nameClass}>{line.name}</div>
+  }
+  return (
+    <Link to={line.productHref} className={`${nameClass} hover:underline`}>
+      {line.name}
+      <span className="sr-only">
+        , цвет {line.color}, размер {line.size}
+      </span>
+    </Link>
+  )
+}
+
 /** «Доставлено 23.04.2026» → префикс + дата (галочку показываем сразу после даты). */
 function splitStatusPrefixAndTrailingDate(text: string): { prefix: string; date: string } | null {
   const m = /^(.+?)\s+(\d{2}\.\d{2}\.\d{4})$/.exec(text.trim())
@@ -268,12 +287,6 @@ export function OrderHistoryDialogContent({ catalogProducts = [] }: OrderHistory
                     <th scope="col" className="hidden py-3 pr-4 font-medium sm:table-cell sm:pr-8">
                       Количество
                     </th>
-                    <th
-                      scope="col"
-                      className="w-[1%] whitespace-nowrap py-3 pl-2 pr-1 text-right font-medium sm:pl-2 sm:pr-2 sm:text-left"
-                    >
-                      Детали
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
@@ -290,7 +303,9 @@ export function OrderHistoryDialogContent({ catalogProducts = [] }: OrderHistory
                             <div className="min-w-0 flex-1">
                               <div>
                                 <div className="text-xs font-medium text-gray-500">Название</div>
-                                <div className="mt-0.5 font-medium text-white">{line.name}</div>
+                                <div className="mt-0.5">
+                                  <OrderLineProductName line={line} />
+                                </div>
                               </div>
                               <dl className="mt-2 grid gap-y-0.5 text-xs text-gray-400">
                                 <div className="flex flex-wrap gap-x-2">
@@ -340,7 +355,7 @@ export function OrderHistoryDialogContent({ catalogProducts = [] }: OrderHistory
                             className="size-20 shrink-0 rounded-md border border-white/10 object-cover"
                           />
                           <div>
-                            <div className="font-medium text-white">{line.name}</div>
+                            <OrderLineProductName line={line} />
                             <p className="mt-1 flex flex-nowrap items-center gap-x-3 text-sm text-gray-400">
                               <span className="inline-flex shrink-0 items-baseline gap-1">
                                 <span className="text-gray-500">Размер:</span>
@@ -371,17 +386,6 @@ export function OrderHistoryDialogContent({ catalogProducts = [] }: OrderHistory
                       </td>
                       <td className="hidden align-middle py-6 pr-8 sm:table-cell tabular-nums">
                         {formatQty(line.quantity)}
-                      </td>
-                      <td className="w-[1%] whitespace-nowrap align-middle py-6 pl-2 pr-1 text-right sm:pl-2 sm:pr-2 sm:text-left">
-                        <Link
-                          to={line.productHref}
-                          className="inline-block min-w-0 font-medium text-indigo-400 hover:text-indigo-300"
-                        >
-                          Товар
-                          <span className="sr-only">
-                            , {line.name}, цвет {line.color}, размер {line.size}
-                          </span>
-                        </Link>
                       </td>
                     </tr>
                   ))}

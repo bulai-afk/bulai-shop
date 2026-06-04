@@ -2,6 +2,7 @@ import {
   AcademicCapIcon,
   EnvelopeIcon,
   LifebuoyIcon,
+  LinkIcon,
   MoonIcon,
   PhoneIcon,
   ShareIcon,
@@ -11,57 +12,17 @@ import {
 import { useId, type ComponentType, type SVGProps } from 'react'
 import { Link } from 'react-router-dom'
 import type { PromoValueIconId } from '../admin/types/siteSettings'
-import { useStorefrontPromoMaterials } from '../context/StorefrontSettingsContext'
 import { BulaiLogo } from '../components/BulaiLogo'
+import {
+  useStorefrontPromoMaterials,
+  useStorefrontSiteConfig,
+} from '../context/StorefrontSettingsContext'
+import { socialIconFromDraft } from '../utils/socialDraftIcons'
 
 type ValueIcon = ComponentType<SVGProps<SVGSVGElement>>
 
 const HERO_BLOB_CLIP =
   'polygon(63.1% 29.5%, 100% 17.1%, 76.6% 3%, 48.4% 0%, 44.6% 4.7%, 54.5% 25.3%, 59.8% 49%, 55.2% 57.8%, 44.4% 57.2%, 27.8% 47.9%, 35.1% 81.5%, 0% 97.7%, 39.2% 100%, 35.2% 81.4%, 97.2% 52.8%, 63.1% 29.5%)'
-
-const CONTACT_EMAIL = 'hello@example.com'
-const CONTACT_PHONE_DISPLAY = '+7 (000) 000-00-00'
-const CONTACT_PHONE_TEL = '+70000000000'
-
-/** Подставьте свои ссылки; сейчас заглушки как в футере */
-const CONTACT_SOCIAL: { name: string; href: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
-  {
-    name: 'Telegram',
-    href: 'https://t.me/',
-    Icon: (props) => (
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden {...props}>
-        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 1.667-.715 2.01-1.05 2.242-1.05z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'WhatsApp',
-    href: 'https://wa.me/70000000000',
-    Icon: (props) => (
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden {...props}>
-        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'ВКонтакте',
-    href: 'https://vk.com/',
-    Icon: (props) => (
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden {...props}>
-        <path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C4.624 10.857 4.03 8.57 4.03 8.096c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.863 2.491 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.644v4.675c0 .373.17.508.271.508.22 0 .407-.136.813-.542 1.253-1.406 2.15-3.574 2.15-3.574.17-.254.322-.373.78-.373h1.744c.525 0 .644.27.525.644-.254 1.186-2.607 3.844-2.607 3.844-.203.254-.27.373 0 .644.203.254.88 1.033 1.338 1.744.372.593.744 1.033.744 1.338 0 .254-.136.491-.593.491z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'YouTube',
-    href: 'https://www.youtube.com/',
-    Icon: (props) => (
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden {...props}>
-        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-      </svg>
-    ),
-  },
-]
 
 const VALUE_ICONS: Record<PromoValueIconId, ValueIcon> = {
   sparkles: SparklesIcon,
@@ -76,6 +37,12 @@ const IMG_OVERLAY = 'pointer-events-none absolute inset-0 rounded-2xl ring-1 rin
 
 export function AboutPage() {
   const { aboutHero, aboutMission, aboutValues } = useStorefrontPromoMaterials()
+  const site = useStorefrontSiteConfig()
+  const contactEmail = site.contact.email.trim() || 'hello@example.com'
+  const contactPhoneTel = site.contact.phoneTel.trim()
+  const contactPhoneDisplay =
+    site.contact.phoneDisplay.trim() || contactPhoneTel
+  const contactSocialLinks = site.socialLinks.filter((l) => l.href.trim())
   const uid = useId().replace(/:/g, '')
   const heroPatternId = `about-hero-grid-${uid}`
   const logoPatternId = `about-logo-grid-${uid}`
@@ -276,48 +243,60 @@ export function AboutPage() {
           <div className="mx-auto mt-12 flex w-full max-w-4xl flex-col items-center gap-8 sm:mt-14 sm:gap-10">
             <div className="flex w-full flex-col items-center gap-10 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-14 sm:gap-y-8 lg:gap-x-20">
               <a
-                href={`mailto:${CONTACT_EMAIL}`}
-                aria-label={`Написать на ${CONTACT_EMAIL}`}
+                href={`mailto:${contactEmail}`}
+                aria-label={`Написать на ${contactEmail}`}
                 className="group flex w-full min-w-0 max-w-full items-center justify-center gap-4 text-xl font-semibold text-white transition-colors hover:text-indigo-300 sm:w-auto sm:max-w-[min(100%,28rem)] sm:justify-start sm:text-2xl lg:text-3xl"
               >
                 <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-400/25 transition group-hover:ring-indigo-400/40">
                   <EnvelopeIcon className="size-8 text-indigo-400" aria-hidden />
                 </span>
                 <span className="min-w-0 break-all text-center sm:break-normal sm:text-left">
-                  {CONTACT_EMAIL}
+                  {contactEmail}
                 </span>
               </a>
-              <a
-                href={`tel:${CONTACT_PHONE_TEL}`}
-                aria-label={`Позвонить: ${CONTACT_PHONE_DISPLAY}`}
-                className="group flex w-full shrink-0 items-center justify-center gap-4 text-xl font-semibold text-white transition-colors hover:text-indigo-300 sm:w-auto sm:justify-start sm:text-2xl lg:text-3xl"
-              >
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-400/25 transition group-hover:ring-indigo-400/40">
-                  <PhoneIcon className="size-8 text-indigo-400" aria-hidden />
-                </span>
-                <span className="whitespace-nowrap tabular-nums">{CONTACT_PHONE_DISPLAY}</span>
-              </a>
+              {contactPhoneTel ? (
+                <a
+                  href={`tel:${contactPhoneTel}`}
+                  aria-label={`Позвонить: ${contactPhoneDisplay}`}
+                  className="group flex w-full shrink-0 items-center justify-center gap-4 text-xl font-semibold text-white transition-colors hover:text-indigo-300 sm:w-auto sm:justify-start sm:text-2xl lg:text-3xl"
+                >
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-400/25 transition group-hover:ring-indigo-400/40">
+                    <PhoneIcon className="size-8 text-indigo-400" aria-hidden />
+                  </span>
+                  <span className="whitespace-nowrap tabular-nums">{contactPhoneDisplay}</span>
+                </a>
+              ) : null}
             </div>
-            <ul
-              className="flex w-full flex-wrap items-center justify-center gap-3"
-              aria-label="Мессенджеры и соцсети"
-            >
-              {CONTACT_SOCIAL.map(({ name, href, Icon }) => (
-                <li key={name}>
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={name}
-                    className="group inline-flex"
-                  >
-                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-400/25 transition group-hover:ring-indigo-400/40">
-                      <Icon className="size-8 text-indigo-400" aria-hidden />
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
+            {contactSocialLinks.length > 0 ? (
+              <ul
+                className="flex w-full flex-wrap items-center justify-center gap-3"
+                aria-label="Мессенджеры и соцсети"
+              >
+                {contactSocialLinks.map((item) => {
+                  const href = item.href.trim()
+                  const IconFn = socialIconFromDraft(item.id, item.name)
+                  const external = href.startsWith('http')
+                  return (
+                    <li key={`${item.id}-${item.name}`}>
+                      <a
+                        href={href}
+                        {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                        aria-label={item.name}
+                        className="group inline-flex"
+                      >
+                        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-400/25 transition group-hover:ring-indigo-400/40">
+                          {IconFn ? (
+                            <IconFn className="size-8 text-indigo-400" aria-hidden />
+                          ) : (
+                            <LinkIcon className="size-8 text-indigo-400" aria-hidden />
+                          )}
+                        </span>
+                      </a>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : null}
           </div>
         </div>
       </div>
